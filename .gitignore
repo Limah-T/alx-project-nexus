@@ -1,0 +1,90 @@
+desktop.ini/
+venv
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.manifest
+*.spec
+
+# Django
+*.log
+*.pot
+*.pyc
+*.mo
+*.db
+db.sqlite3
+media/
+staticfiles/
+
+# Environment variables
+.env
+.env.*
+!env.example
+
+# VS Code / PyCharm / Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# Byte-compiled / cache
+*.pyc
+__pycache__/
+*.pkl
+*.pickle
+
+# Docker
+*.pid
+*.seed
+*.cover
+*.log
+*.bak
+*.tar
+*.tgz
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+
+# Django + Docker specifics
+*.pid
+*.seed
+*.cover
+*.log
+*.bak
+*.tar
+*.tgz
+*.tmp
+*.temp
+*.bak
+*.old
+*.orig
+
+# Celery beat schedule
+celerybeat-schedule
+celerybeat.pid
+
+# Redis dump
+dump.rdb
+
+# PostgreSQL dumps
+*.sql
+*.sql.gz
+
+# Node / Frontend (if you integrate React/Vue later)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Mac / Windows
+.DS_Store
+Thumbs.db
+ehthumbs.db

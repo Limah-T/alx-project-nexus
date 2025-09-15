@@ -1,0 +1,43 @@
+# Core
+Django==5.2.4
+djangorestframework==3.16.0
+django-filter==25.1
+django-cors-headers==4.7.0
+django-environ==0.12.0
+
+# Database
+psycopg2-binary==2.9.10
+
+# Authentication & Security
+djangorestframework_simplejwt==5.5.1
+dj-rest-auth==7.0.1
+django-allauth==65.10.0
+django-otp==1.6.0
+django-two-factor-auth==1.17.0
+django-phonenumber-field==8.1.0
+qrcode==7.4.2
+
+# Task Queue & Caching
+celery==5.5.3
+django-celery-beat==2.8.1
+django_celery_results==2.6.0
+redis==6.4.0
+
+# API Documentation
+drf-spectacular==0.28.0
+
+# Media & File Storage
+pillow==11.1.0
+django-cloudinary-storage==0.3.0   # for Cloudinary uploads
+
+# Deployment
+gunicorn==23.0.0
+whitenoise==6.9.0
+
+# Utils
+django-environ==0.12.0
+requests==2.32.3
+
+# Payments (Paystack / Stripe integration)
+paystackapi==2.1.0   # (unofficial SDK, or use raw requests to Paystack API)
+stripe==10.4.0       # (if you want Stripe Connect)
