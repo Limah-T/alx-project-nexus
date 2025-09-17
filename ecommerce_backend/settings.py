@@ -1,5 +1,6 @@
 from pathlib import Path
 import environ, os
+from datetime import timedelta
 
 env = environ.Env(
     DEBUG=(bool, False)
@@ -24,6 +25,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'api',
+    'rest_framework_simplejwt.token_blacklist',
 ]
 
 MIDDLEWARE = [
@@ -98,4 +100,29 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'api.CustomUser'
+
+# Rest framework authentication and permission configurations
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'dj_rest_auth.jwt_auth.JWTCookieAuthentication'
+
+    )
+}
+
+# SimpleJWT configuration 
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(env("ACCESS_TOKEN_LIFETIME"))),  # short-lived access token
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=int(env("REFRESH_TOKEN_LIFETIME"))),    # longer refresh token
+    "ROTATE_REFRESH_TOKENS": bool(env("ROTATE_REFRESH_TOKENS")),      # issue new refresh on each use
+    "BLACKLIST_AFTER_ROTATION": bool(env("BLACKLIST_AFTER_ROTATION")),  # old refresh token becomes invalid
+    "UPDATE_LAST_LOGIN": bool(env("UPDATE_LAST_LOGIN")),      # update user login timestamp
+
+    "ALGORITHM": env("HASH_KEY"),
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
+    "USER_ID_FIELD": env("USER_ID_FIELD"),
+    "USER_ID_CLAIM": env("USER_ID_CLAIM"),
+}
+
 

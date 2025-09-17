@@ -114,12 +114,6 @@ class Product(models.Model):
             self.discount_amount = customer_payout_sale(self.original_price, self.discount_percent)
         super().save(*args, **kwargs)
 
-class CartItem(models.Model):
-   id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-   customer = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='cart_items')
-   product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='cart_items')
-   item_quantity = models.PositiveIntegerField(default=1)
-
 class BankAccount(models.Model):
    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
    vendor = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='bank_details')
@@ -131,3 +125,26 @@ class BankAccount(models.Model):
         if self.name:
            self.name = self.name.title().strip()
         super().save(*args, **kwargs)
+
+class CartItem(models.Model):
+   id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+   customer = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='cart_items')
+   product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='cart_items')
+   item_quantity = models.PositiveIntegerField(default=1)
+
+class Payment(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    cart = models.ForeignKey(CartItem, on_delete=models.CASCADE, related_name='payments')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    method = models.CharField(max_length=8, default="card")
+    status = models.CharField(max_length=10, default="pending")
+    transaction_id = models.CharField(max_length=30, unique=True)
+    date = models.DateTimeField(auto_now_add=True)
+
+class Order(models.Model):
+   id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False) 
+   payment = models.ForeignKey(Payment, on_delete=models.SET_NULL, related_name='orders')
+   payment_status = models.CharField(max_length=10, default="pending")
+   status = models.CharField(max_length=8, default="hold")
+   date = models.DateTimeField(auto_now_add=True)
+
