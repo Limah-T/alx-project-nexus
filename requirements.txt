@@ -5,6 +5,9 @@ django-filter==25.1
 django-cors-headers==4.7.0
 django-environ==0.12.0
 
+# email validator
+email-validator==2.3.0
+
 # Database
 psycopg2-binary==2.9.10
 

@@ -1,7 +1,9 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.core.validators import MinValueValidator, MaxValueValidator
+from phonenumber_field.modelfields import PhoneNumberField
 from .calculation import customer_payout_sale
+
 import uuid
 
 class CustomManager(BaseUserManager):
@@ -10,7 +12,9 @@ class CustomManager(BaseUserManager):
             raise ValueError("This field may not be blank")
         email = self.normalize_email(email=email)
         user = self.model(
-                    first_name=first_name, last_name=last_name, email=email, phone_number=phone_number, address=address, business_address=business_address, business_name=business_name, **extra_kwargs
+                    first_name=first_name, last_name=last_name, email=email,
+                    phone_number=phone_number, address=address, business_address=business_address, 
+                    business_name=business_name, **extra_kwargs
                     )
         user.set_password(password)
         user.save(using=self._db)
@@ -35,14 +39,14 @@ class CustomUser(AbstractUser):
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
     email = models.EmailField(unique=True)
-    phone_number = models.CharField(max_length=20, unique=True)
+    phone_number = PhoneNumberField(unique=True)
     address = models.TextField(null=True, blank=True)
     business_address = models.TextField(null=True, blank=True)
     business_name = models.CharField(max_length=100, null=True, blank=True)
     role = models.CharField(max_length=8, default="customer")
     email_verified = models.BooleanField(default=False)
     otp_verified = models.BooleanField(default=False)
-    pending_email = models.EmailField(default=None)
+    pending_email = models.EmailField(null=True, blank=True)
     reset_password = models.BooleanField(default=False)
     time_reset = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
@@ -59,7 +63,7 @@ class CustomUser(AbstractUser):
         if self.email:
             self.email = self.email.lower().strip()
         if self.phone_number:
-            self.phone_number = self.phone_number.strip()
+            self.phone_number = self.phone_number
         if self.address:
             self.address = self.address.strip()
         if self.business_address:
@@ -143,7 +147,7 @@ class Payment(models.Model):
 
 class Order(models.Model):
    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False) 
-   payment = models.ForeignKey(Payment, on_delete=models.SET_NULL, related_name='orders')
+   payment = models.ForeignKey(Payment, on_delete=models.SET_NULL, null=True, blank=True, related_name='orders')
    payment_status = models.CharField(max_length=10, default="pending")
    status = models.CharField(max_length=8, default="hold")
    date = models.DateTimeField(auto_now_add=True)
