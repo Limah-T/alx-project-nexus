@@ -1,9 +1,15 @@
 from rest_framework import serializers
+from rest_framework_simplejwt import serializers as JWT_SERIALIZER
 from django.core.validators import MinLengthValidator
+from django.contrib.auth import authenticate
+
 from phonenumber_field.serializerfields import PhoneNumberField
 
+from django.utils import timezone
+from datetime import datetime
 from .models import CustomUser
 import email_validator, os
+
 
 class CustomerRegSerializer(serializers.Serializer):
     id = serializers.UUIDField(read_only=True)
@@ -87,18 +93,28 @@ class VendorRegSerializer(serializers.Serializer):
         user.save()
         return user
 
-class LoginSerializer(serializers.Serializer):
+class LoginSerializer(JWT_SERIALIZER.TokenObtainPairSerializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, style={'input_type': 'password'})
-
-    def validate_email(self, value):
-        email = value.lower()
+        
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        email = attrs['email'].lower()
         try:
             valid_email = email_validator.validate_email(email, check_deliverability=False)
-            email = CustomUser.objects.get(email=valid_email.normalized)
+            email = CustomUser.objects.get(email=valid_email.normalized, is_active=True)
         except CustomUser.DoesNotExist:
             raise serializers.ValidationError('Email does not exist.')
-        return email
+        user = authenticate(email=email, password=attrs['password'])
+        if not user:
+            raise serializers.ValidationError({"error": "Could not log in with the provided credentials"})
+        if not user.email_verified:
+            raise serializers.ValidationError({"error": "Email has not been verified"})
+        if not user.is_active:
+            raise serializers.ValidationError({"error": "User's account has been deactivated."})
+        self.user = user
+        data.update({'user': self.user})
+        return data
 
 class ResetPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -107,10 +123,10 @@ class ResetPasswordSerializer(serializers.Serializer):
         email = value.lower()
         try:
             valid_email = email_validator.validate_email(email, check_deliverability=False)
-            email = CustomUser.objects.get(email=valid_email.normalized)
+            user = CustomUser.objects.get(email=valid_email.normalized, is_active=True)
         except CustomUser.DoesNotExist:
             raise serializers.ValidationError('Email does not exist.')
-        return email
+        return user
 
 class SetPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -124,9 +140,16 @@ class SetPasswordSerializer(serializers.Serializer):
         email = value.lower()
         try:
             valid_email = email_validator.validate_email(email, check_deliverability=False)
-            user = CustomUser.objects.get(email=valid_email.normalized)
+            user = CustomUser.objects.get(email=valid_email.normalized, is_active=True)
         except CustomUser.DoesNotExist:
             raise serializers.ValidationError('Email does not exist.')
+        if not user.reset_password:
+            raise serializers.ValidationError("Please request for email to reset your password")
+        if timezone.now() > user.time_reset:
+            user.time_reset = None
+            user.reset_password = False
+            user.save(update_fields=["time_reset", "reset_password"])
+            raise serializers.ValidationError("Reset time has expired")
         return user
     
 class ChangePasswordSerializer(serializers.Serializer):

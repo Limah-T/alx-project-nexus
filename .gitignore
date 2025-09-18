@@ -1,5 +1,7 @@
 desktop.ini/
 venv
+public_key.pem
+private_key.pem
 # Python
 __pycache__/
 *.py[cod]

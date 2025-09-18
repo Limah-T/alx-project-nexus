@@ -48,7 +48,7 @@ class CustomUser(AbstractUser):
     otp_verified = models.BooleanField(default=False)
     pending_email = models.EmailField(null=True, blank=True)
     reset_password = models.BooleanField(default=False)
-    time_reset = models.BooleanField(default=False)
+    time_reset = models.DateTimeField(default=None, null=True, blank=True)
     is_active = models.BooleanField(default=True)
     username = None
 

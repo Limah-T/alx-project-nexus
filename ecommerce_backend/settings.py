@@ -25,8 +25,10 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'api',
+    
+    # Third part apps
     'rest_framework_simplejwt.token_blacklist',
-    'phonenumber_field',
+    'phonenumber_field', 
 ]
 
 MIDDLEWARE = [
@@ -35,8 +37,10 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django_otp.middleware.OTPMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'api.middleware.RejectInvalidatedToken',
 ]
 
 ROOT_URLCONF = 'ecommerce_backend.urls'
@@ -115,27 +119,34 @@ AUTH_USER_MODEL = 'api.CustomUser'
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'dj_rest_auth.jwt_auth.JWTCookieAuthentication'
 
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     )
 }
+with open("private_key.pem", "rb") as file:
+    private_key = file.read()
+
+with open("public_key.pem", "rb") as file:
+    public_key = file.read()
 
 # SimpleJWT configuration 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(env("ACCESS_TOKEN_LIFETIME"))),  # short-lived access token
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=int(env("REFRESH_TOKEN_LIFETIME"))),    # longer refresh token
-    "ROTATE_REFRESH_TOKENS": bool(env("ROTATE_REFRESH_TOKENS")),      # issue new refresh on each use
-    "BLACKLIST_AFTER_ROTATION": bool(env("BLACKLIST_AFTER_ROTATION")),  # old refresh token becomes invalid
-    "UPDATE_LAST_LOGIN": bool(env("UPDATE_LAST_LOGIN")),      # update user login timestamp
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(env("ACCESS_TOKEN_LIFETIME"))),  
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=int(env("REFRESH_TOKEN_LIFETIME"))),    
+    "ROTATE_REFRESH_TOKENS": bool(env("ROTATE_REFRESH_TOKENS")),      
+    "BLACKLIST_AFTER_ROTATION": bool(env("BLACKLIST_AFTER_ROTATION")),  
+    "UPDATE_LAST_LOGIN": bool(env("UPDATE_LAST_LOGIN")),      
 
     "ALGORITHM": env("HASH_KEY"),
+    "SIGNING_KEY": private_key,
+    "VERIFYING_KEY": public_key,
     "AUTH_HEADER_TYPES": ("Bearer",),
     "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
     "USER_ID_FIELD": env("USER_ID_FIELD"),
     "USER_ID_CLAIM": env("USER_ID_CLAIM"),
+    "TOKEN_OBTAIN_SERIALIZER": "api.auth_serializers.LoginSerializer",
 }
 
 
