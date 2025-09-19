@@ -1,11 +1,11 @@
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
-from api.models import CustomUser
+from rest_framework_simplejwt.tokens import AccessToken
+from api.models import CustomUser, BlaskListAccessToken
 from datetime import timedelta
 from django.utils import timezone
 import os
 
 def check_email_id_exist_in_token(email, id):
-    # This function is great for registration confirmation because email hasn't been verified yet
     try:
         user = CustomUser.objects.get(email=email, is_active=True)
     except CustomUser.DoesNotExist:
@@ -23,9 +23,6 @@ def set_user_password_reset_time(user):
     user.save(update_fields=['reset_password', 'time_reset'])
     return True
 
-def black_list_user_tokens(user):
-    user_tokens = OutstandingToken.objects.filter(user=user)
-    for token in user_tokens:
-        BlacklistedToken.objects.get_or_create(token=token)
-        token.delete()
+
+
 

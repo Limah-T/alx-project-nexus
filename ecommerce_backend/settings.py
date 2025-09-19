@@ -40,7 +40,6 @@ MIDDLEWARE = [
     'django_otp.middleware.OTPMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'api.middleware.RejectInvalidatedToken',
 ]
 
 ROOT_URLCONF = 'ecommerce_backend.urls'
