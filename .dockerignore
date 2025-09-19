@@ -26,3 +26,7 @@ Thumbs.db
 *.sqlite3
 staticfiles/
 media/
+
+# RS256 keys
+public_key.pem
+private_key.pem

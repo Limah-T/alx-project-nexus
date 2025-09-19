@@ -48,8 +48,9 @@ class CustomUser(AbstractUser):
     otp_verified = models.BooleanField(default=False)
     pending_email = models.EmailField(null=True, blank=True)
     reset_password = models.BooleanField(default=False)
-    time_reset = models.BooleanField(default=False)
+    time_reset = models.DateTimeField(default=None, null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
     username = None
 
     USERNAME_FIELD = 'email'
@@ -96,6 +97,7 @@ class Product(models.Model):
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
     vendor = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='products')
     color = models.ManyToManyField(Color, related_name='products', blank=True)
+    image = models.ImageField(upload_to='images/', blank=True)
     name = models.CharField(max_length=200)
     description = models.TextField()
     stock = models.PositiveIntegerField(default=0)
@@ -110,6 +112,7 @@ class Product(models.Model):
         null=True, blank=True
     )
     date_added = models.DateField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
         if self.name:
@@ -124,6 +127,7 @@ class BankAccount(models.Model):
    number = models.CharField(max_length=20)
    name = models.CharField(max_length=200, help_text="Provide the exact bank name")
    bank_name = models.CharField(max_length=200)
+   updated_at = models.DateTimeField(auto_now=True)
 
    def save(self, *args, **kwargs):
         if self.name:
@@ -135,6 +139,7 @@ class CartItem(models.Model):
    customer = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='cart_items')
    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='cart_items')
    item_quantity = models.PositiveIntegerField(default=1)
+   updated_at = models.DateTimeField(auto_now=True)
 
 class Payment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -152,3 +157,11 @@ class Order(models.Model):
    status = models.CharField(max_length=8, default="hold")
    date = models.DateTimeField(auto_now_add=True)
 
+"""*********************BlackListToken to save blacklisted tokens*********************"""
+
+class BlaskListAccessToken(models.Model):
+    jti = models.CharField(max_length=255, unique=True)
+    blacklisted_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.jti
