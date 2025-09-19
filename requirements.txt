@@ -14,6 +14,9 @@ psycopg2-binary==2.9.10
 # Crytography for private and public keys
 cryptography==46.0.1
 
+# Cloud image storage
+cloudinary==1.44.1
+
 # Authentication & Security
 djangorestframework_simplejwt==5.5.1
 dj-rest-auth==7.0.1

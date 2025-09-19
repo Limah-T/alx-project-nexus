@@ -97,6 +97,7 @@ class Product(models.Model):
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
     vendor = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='products')
     color = models.ManyToManyField(Color, related_name='products', blank=True)
+    image = models.ImageField(upload_to='images/', blank=True)
     name = models.CharField(max_length=200)
     description = models.TextField()
     stock = models.PositiveIntegerField(default=0)

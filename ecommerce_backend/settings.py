@@ -23,12 +23,14 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'cloudinary',
     'django.contrib.staticfiles',
     'api',
     
     # Third part apps
     'rest_framework_simplejwt.token_blacklist',
     'phonenumber_field', 
+    
 ]
 
 MIDDLEWARE = [
@@ -148,4 +150,13 @@ SIMPLE_JWT = {
     "TOKEN_OBTAIN_SERIALIZER": "api.auth_serializers.LoginSerializer",
 }
 
+# Cloudinary configuration
 
+"CLOUDINARY_STORAGE" = {
+    "CLOUD_NAME": env("CLOUDINARY_NAME"),
+    "API_KEY": env("CLOUDINARY_API_KEY"),
+    "API_SECRET": env("CLOUDINARY_API_SECRET")
+}
+
+MEDIA_URL = '/media'
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
