@@ -205,7 +205,7 @@ class LogoutView(APIView):
         return Response({'success': 'Logged out.'}, status=status.HTTP_200_OK)
     
     
-"""**********************************Profile Section******************************************"""
+"""****************************Profile Section******************************************"""
 
 class CustomerProfileView(ModelViewSet):
     serializer_class = CustomerProfileSerializer
