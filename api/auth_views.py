@@ -12,7 +12,6 @@ from .utils.token import encode_token, decode_token, black_list_user_tokens, rej
 from .utils.helper_functions import check_email_id_exist_in_token, set_user_password_reset_time
 from .models import CustomUser, BlaskListAccessToken
 from .tasks import send_email
-from .cloudinary import createmain
 import os
 
 class CustomerRegView(APIView):
@@ -207,7 +206,6 @@ class LogoutView(APIView):
     
     
 """****************************Profile Section******************************************"""
-
 class CustomerProfileView(ModelViewSet):
     serializer_class = CustomerProfileSerializer
     
@@ -215,7 +213,6 @@ class CustomerProfileView(ModelViewSet):
         return self.request.user
     
     def retrieve(self, request, *args, **kwargs):
-        createmain()
         if not reject_invalid_access_token(request):
             return Response({"error": "Inavid token."}, status=status.HTTP_400_BAD_REQUEST)
         serializer = self.serializer_class(request.user)
