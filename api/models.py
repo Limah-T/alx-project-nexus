@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils.text import slugify
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.core.validators import MinValueValidator, MaxValueValidator
 from phonenumber_field.modelfields import PhoneNumberField
@@ -47,6 +48,7 @@ class CustomUser(AbstractUser):
     email_verified = models.BooleanField(default=False)
     otp_verified = models.BooleanField(default=False)
     pending_email = models.EmailField(null=True, blank=True)
+    time_pending_email = models.DateTimeField(default=None, null=True, blank=True)
     reset_password = models.BooleanField(default=False)
     time_reset = models.DateTimeField(default=None, null=True, blank=True)
     is_active = models.BooleanField(default=True)
@@ -75,17 +77,32 @@ class CustomUser(AbstractUser):
 
 class Category(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=200)
-    date = models.DateField(auto_now_add=True)
+    name = models.CharField(max_length=200, unique=True)
+    slug = models.SlugField(max_length=50, unique=True, db_index=True, blank=True)
+    date = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True) #Better to hide than delete
 
     def save(self, *args, **kwargs):
         if self.name:
             self.name = self.name.title()
+        if not self.slug:
+            self.slug = self.create_slug_for_category
         super().save(*args, **kwargs)
+
+    @property
+    def create_slug_for_category(self):
+        baseURL = slugify(self.name)
+        slug = baseURL
+        counter = 1
+        while Category.objects.filter(slug=slug).exists():
+            slug = f"{baseURL}-{counter}"
+            counter += 1
+        return slug
 
 class Color(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=200)
+    name = models.CharField(max_length=200, unique=True)
+    date = models.DateField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
         if self.name:
@@ -94,6 +111,7 @@ class Color(models.Model):
 
 class Product(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    slug = models.SlugField(max_length=50, unique=True, db_index=True, blank=True)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
     vendor = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='products')
     color = models.ManyToManyField(Color, related_name='products', blank=True)
@@ -119,7 +137,19 @@ class Product(models.Model):
             self.name = self.name.title().strip()
         if self.discount_percent != 0:
             self.discount_amount = customer_payout_sale(self.original_price, self.discount_percent)
+        if not self.slug:
+            self.slug = self.create_slug_for_product
         super().save(*args, **kwargs)
+
+    @property
+    def create_slug_for_product(self):
+        baseURL = slugify(self.name)
+        slug = baseURL
+        counter = 1
+        while Product.objects.filter(slug=slug).exists():
+            slug = f"{baseURL}-{counter}"
+            counter += 1
+        return slug
 
 class BankAccount(models.Model):
    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
