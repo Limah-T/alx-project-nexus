@@ -44,7 +44,7 @@ def black_list_user_tokens(user):
     for token in user_tokens:
         BlacklistedToken.objects.get_or_create(token=token)
 
-def reject_invalid_access_token(auth_token):
+def valid_access_token(auth_token):
     try:  # parse JWT
         if not BlaskListAccessToken.objects.filter(jti=auth_token).exists():
             return True   # token is valid and not blacklisted

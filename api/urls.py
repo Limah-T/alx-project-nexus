@@ -1,6 +1,10 @@
 from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
 from django.urls import path
+
 from .auth_views import CustomerRegView, VendorRegView, LoginView, ResetPasswordView, SetPasswordView, ChangePasswordView, LogoutView, verifyRegEmail, verifyPasswordResetEmail, verifyEmailUpdate, verifyAcctDeactivation, CustomerProfileView, VendorProfileView
+
+from .views import CategoryView
+
 from .admin_views import ModifyUserView
 
 urlpatterns = [
@@ -30,5 +34,14 @@ urlpatterns = [
     # admin routes
     path('users/', ModifyUserView.as_view({'get': 'list'}), name='users'),
     path('user/<uuid:id>/', ModifyUserView.as_view({'get': 'retrieve', 'delete': 'destroy'}), name='user'),
+
+    # Category
+    path('category/', CategoryView.as_view({'post': 'create', 
+                                            'get': 'list'}),
+                                            name='category'
+                                            ),
+    path('category/<uuid:id>', CategoryView.as_view({'get': 'retrieve', 
+                                                     'put': 'update', 'patch':'update', 'delete': 'destroy'}), name='category_id'
+                                            ),
 
 ]

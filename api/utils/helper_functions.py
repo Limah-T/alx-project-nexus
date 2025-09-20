@@ -23,6 +23,12 @@ def set_user_password_reset_time(user):
     user.save(update_fields=['reset_password', 'time_reset'])
     return True
 
-
-
+def check_if_admin(user):
+    if not user.email_verified:
+        return False
+    if not user.is_active:
+        return False
+    if not user.is_superuser:
+        return False
+    return True
 

