@@ -31,4 +31,3 @@ def check_if_admin(user):
     if not user.is_superuser:
         return False
     return True
-

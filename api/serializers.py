@@ -29,33 +29,32 @@ class CategorySerializer(serializers.Serializer):
         instance.save()
         return instance
 
-class ColorSerializer(serializers.ModelSerializer):
+class ColorSerializer(serializers.Serializer):
     id = serializers.UUIDField(read_only=True)
     name = serializers.CharField(validators=[MinLengthValidator(2)],
                                 max_length=200)
     
     def validate_name(self, value):
         if Color.objects.filter(name__iexact=value).exists():
-            raise serializers.ValidationError("Category name already exist.")
+            raise serializers.ValidationError("Color name already exist.")
         return value
 
     def create(self, validated_data):
         if isinstance(validated_data, list):
-            category = [Color(**item) for item in validated_data]
-            return Color.objects.bulk_create(category) 
+            colors = [Color(**item) for item in validated_data]
+            return Color.objects.bulk_create(colors) 
         return Color.objects.create(**validated_data)
     
-    # def update(self, instance, validated_data):
-    #     name = validated_data['name']
-    #     if Category.objects.exclude(id=instance.id).filter(name__iexact=name).exists():
-    #         raise serializers.ValidationError({"error": "Category name already exist."}
-    #             )
-    #     return super().update(instance, validated_data)
+    def update(self, instance, validated_data):       
+        name = validated_data["name"]       
+        instance.name = name
+        instance.save()
+        return instance
     
 class ProductSerializer(serializers.Serializer):
     id = serializers.UUIDField(read_only=True)
     slug = serializers.SlugField(read_only=True)
-    # category = serializers.UUIDField(read_only=True)
+    category = serializers.UUIDField()
     name = serializers.CharField()
     # color = serializers.SerializerMethodField()
     image = serializers.ImageField()

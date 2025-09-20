@@ -3,7 +3,7 @@ from django.urls import path
 
 from .auth_views import CustomerRegView, VendorRegView, LoginView, ResetPasswordView, SetPasswordView, ChangePasswordView, LogoutView, verifyRegEmail, verifyPasswordResetEmail, verifyEmailUpdate, verifyAcctDeactivation, CustomerProfileView, VendorProfileView
 
-from .views import CategoryView
+from .views import CategoryView, ColorView, ProductView
 
 from .admin_views import ModifyUserView
 
@@ -28,20 +28,27 @@ urlpatterns = [
     path('verify/acct_deactivation', verifyAcctDeactivation, name='verify_acct_deactivate'),
     
     # profile 
-    path('customer/profile/', CustomerProfileView.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'update', 'delete': 'destroy'}), name='customer_profile'),
-    path('vendor/profile/', VendorProfileView.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'update', 'delete': 'destroy'}), name='vendor_profile'),
+    path('customer/profile/', CustomerProfileView.as_view({'get': 'retrieve', 'put': 'update',  
+                                                           'patch': 'update', 'delete': 'destroy'}), name='customer_profile'),
+    path('vendor/profile/', VendorProfileView.as_view({'get': 'retrieve', 'put': 'update', 
+                                                       'patch': 'update', 'delete': 'destroy'}), name='vendor_profile'),
     
     # admin routes
     path('users/', ModifyUserView.as_view({'get': 'list'}), name='users'),
-    path('user/<uuid:id>/', ModifyUserView.as_view({'get': 'retrieve', 'delete': 'destroy'}), name='user'),
+    path('user/<uuid:id>/', ModifyUserView.as_view({'get': 'retrieve', 'delete': 'destroy'}),
+                                                    name='user'),
 
     # Category
-    path('category/', CategoryView.as_view({'post': 'create', 
-                                            'get': 'list'}),
-                                            name='category'
-                                            ),
+    path('category/', CategoryView.as_view({'post': 'create', 'get': 'list'}), name='category'),
     path('category/<uuid:id>', CategoryView.as_view({'get': 'retrieve', 
                                                      'put': 'update', 'patch':'update', 'delete': 'destroy'}), name='category_id'
                                             ),
+    # Color
+    path('color/', ColorView.as_view({'post': 'create', 'get': 'list'}), name='color'),
+    path('color/<uuid:id>', ColorView.as_view({'get': 'retrieve', 
+                                                     'put': 'update', 'patch':'update', 'delete': 'destroy'}), name='color_id'
+                                            ),
 
+    # Product
+    path('product/', ProductView.as_view({'post': 'create', 'get': 'list'}), name='product'),
 ]
