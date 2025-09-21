@@ -18,8 +18,8 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='logout'),
 
     # token refresh view
-    path('token/refresh', TokenRefreshView.as_view(), name='token_refresh'),
-    path('token/verify', TokenVerifyView.as_view(), name='token_verify'),
+    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('token/verify/', TokenVerifyView.as_view(), name='token_verify'),
 
     # email verification
     path('verify_email/register', verifyRegEmail, name="verify_reg_email"),
@@ -51,4 +51,7 @@ urlpatterns = [
 
     # Product
     path('product/', ProductView.as_view({'post': 'create', 'get': 'list'}), name='product'),
+    path('product/<uuid:id>', ProductView.as_view({'get': 'retrieve', 'put': 'update',
+                                                   'patch': 'update', 'delete': 'destroy'}), name='product_id'
+                                            ),
 ]

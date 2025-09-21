@@ -116,20 +116,23 @@ class Product(models.Model):
     vendor = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='products')
     color = models.ManyToManyField(Color, related_name='products', blank=True)
     image = models.ImageField(upload_to='images/', blank=True)
+    public_id = models.CharField(blank=True)
+    srcURL = models.URLField(blank=True)
     name = models.CharField(max_length=200)
     description = models.TextField()
     stock = models.PositiveIntegerField(default=0)
     original_price = models.DecimalField(max_digits=10, decimal_places=2)
     discount_percent = models.PositiveIntegerField(
                     validators=[MinValueValidator(0), MaxValueValidator(70)],
-                    default=0, help_text="Discount percentage (0–70)."
+                    default=0, help_text="Discount percentage (0–70).", null=True, blank=True
     )
     discount_amount = models.DecimalField(
         max_digits=10,
         decimal_places=2,
+        default=0,
         null=True, blank=True
     )
-    date_added = models.DateField(auto_now_add=True)
+    date_added = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):

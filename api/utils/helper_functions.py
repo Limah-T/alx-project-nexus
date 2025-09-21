@@ -31,3 +31,11 @@ def check_if_admin(user):
     if not user.is_superuser:
         return False
     return True
+
+def request_instance(request_body):
+    many = True
+    if not isinstance(request_body.data, list):
+        many = False
+        return many
+    else:
+        return many

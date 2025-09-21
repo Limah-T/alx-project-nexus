@@ -1,21 +1,32 @@
 import cloudinary.uploader
 import cloudinary.api
-from cloudinary import CloudinaryImage
 
 def uploadImage(image):
+    try:
+        upload_result = cloudinary.uploader.upload(
+            image,
+            overwrite=True,
+            resource_type="image"
+        )
+    except Exception as e:
+        print(str(e))
+        return str(e)
+    return upload_result
 
-  # Upload the image and get its URL
-  # ==============================
+def getImage(public_id):
+    try:
+        response = cloudinary.api.resource(public_id)
+    except Exception as e:
+        print(str(e))
+        return False
+    return response
 
-  # Upload the image.
-  # Set the asset's public ID and allow overwriting the asset with new versions
-  cloudinary.uploader.upload(image, secure=True)
-
-  # Build the URL for the image and save it in the variable 'srcURL'
-  srcURL = CloudinaryImage(f"quickstart_{image}").build_url()
-
-  # Log the image URL to the console. 
-  # Copy this URL in a browser tab to generate the image on the fly.
-  print("****2. Upload an image****\nDelivery URL: ", srcURL, "\n")
-
-
+def updateImage(public_id):
+    try:
+        response = cloudinary.uploader.explicit(
+            public_id=public_id,
+            type="upload"
+        )
+    except Exception as e:
+        return False
+    return response
