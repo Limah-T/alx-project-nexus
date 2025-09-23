@@ -1,6 +1,7 @@
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 from rest_framework_simplejwt.tokens import AccessToken
-from api.models import CustomUser, BlaskListAccessToken
+from ..models import CustomUser, BlaskListAccessToken, CartItem, Cart, Checkout, Product
+from django.shortcuts import get_object_or_404
 from datetime import timedelta
 from django.utils import timezone
 import os
@@ -31,3 +32,12 @@ def check_if_admin(user):
     if not user.is_superuser:
         return False
     return True
+
+def request_instance(request_body):
+    many = True
+    if not isinstance(request_body.data, list):
+        many = False
+        return many
+    else:
+        return many
+    

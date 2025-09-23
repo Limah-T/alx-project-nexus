@@ -3,7 +3,6 @@ from django.utils.text import slugify
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.core.validators import MinValueValidator, MaxValueValidator
 from phonenumber_field.modelfields import PhoneNumberField
-from .calculation import customer_payout_sale
 
 import uuid
 
@@ -116,23 +115,27 @@ class Product(models.Model):
     vendor = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='products')
     color = models.ManyToManyField(Color, related_name='products', blank=True)
     image = models.ImageField(upload_to='images/', blank=True)
+    public_id = models.CharField(blank=True)
+    srcURL = models.URLField(blank=True)
     name = models.CharField(max_length=200)
     description = models.TextField()
     stock = models.PositiveIntegerField(default=0)
     original_price = models.DecimalField(max_digits=10, decimal_places=2)
     discount_percent = models.PositiveIntegerField(
                     validators=[MinValueValidator(0), MaxValueValidator(70)],
-                    default=0, help_text="Discount percentage (0–70)."
+                    default=0, help_text="Discount percentage (0–70).", null=True, blank=True
     )
     discount_amount = models.DecimalField(
         max_digits=10,
         decimal_places=2,
+        default=0,
         null=True, blank=True
     )
-    date_added = models.DateField(auto_now_add=True)
+    date_added = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
+        from .utils.calculation import customer_payout_sale
         if self.name:
             self.name = self.name.title().strip()
         if self.discount_percent != 0:
@@ -150,13 +153,17 @@ class Product(models.Model):
             slug = f"{baseURL}-{counter}"
             counter += 1
         return slug
-
+    # What does the default do or mean in the get_or_create?
+    
 class BankAccount(models.Model):
    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
    vendor = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='bank_details')
-   number = models.CharField(max_length=20)
+   number = models.CharField(max_length=20, unique=True)
    name = models.CharField(max_length=200, help_text="Provide the exact bank name")
    bank_name = models.CharField(max_length=200)
+   bank_code = models.CharField(max_length=20, null=True, blank=True)
+   subaccount_code = models.CharField(max_length=100, null=True, blank=False, unique=True)
+   verified = models.BooleanField(default=False)
    updated_at = models.DateTimeField(auto_now=True)
 
    def save(self, *args, **kwargs):
@@ -164,12 +171,35 @@ class BankAccount(models.Model):
            self.name = self.name.title().strip()
         super().save(*args, **kwargs)
 
-class CartItem(models.Model):
+class Cart(models.Model):
    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
    customer = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='cart_items')
-   product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='cart_items')
-   item_quantity = models.PositiveIntegerField(default=1)
    updated_at = models.DateTimeField(auto_now=True)
+
+class CartItem(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name="items")
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    item_quantity = models.PositiveIntegerField(default=1)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    @property
+    def cal_total_amount(self):
+        from .utils.calculation import customer_payout_sale
+        if self.product.discount_percent != 0:
+            discount_amount = customer_payout_sale(self.product.original_price, self.product.discount_percent)
+            total_amount = discount_amount * self.item_quantity
+        else:
+            total_amount = self.product.original_price * self.item_quantity
+        return total_amount
+
+class Checkout(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True)
+    shipping_address = models.TextField(blank=True, null=True)
+    billing_address = models.TextField(blank=True, null=True)
+    payment_method = models.CharField(max_length=50, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
 class Payment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

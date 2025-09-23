@@ -3,7 +3,7 @@ from django.urls import path
 
 from .auth_views import CustomerRegView, VendorRegView, LoginView, ResetPasswordView, SetPasswordView, ChangePasswordView, LogoutView, verifyRegEmail, verifyPasswordResetEmail, verifyEmailUpdate, verifyAcctDeactivation, CustomerProfileView, VendorProfileView
 
-from .views import CategoryView, ColorView, ProductView
+from .views import CategoryView, ColorView, ProductView, CartItemView, BankAccountView, confirmBankNameView
 
 from .admin_views import ModifyUserView
 
@@ -18,8 +18,8 @@ urlpatterns = [
     path('logout/', LogoutView.as_view(), name='logout'),
 
     # token refresh view
-    path('token/refresh', TokenRefreshView.as_view(), name='token_refresh'),
-    path('token/verify', TokenVerifyView.as_view(), name='token_verify'),
+    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('token/verify/', TokenVerifyView.as_view(), name='token_verify'),
 
     # email verification
     path('verify_email/register', verifyRegEmail, name="verify_reg_email"),
@@ -51,4 +51,14 @@ urlpatterns = [
 
     # Product
     path('product/', ProductView.as_view({'post': 'create', 'get': 'list'}), name='product'),
+    path('product/<uuid:id>', ProductView.as_view({'get': 'retrieve', 'put': 'update',
+                                                   'patch': 'update', 'delete': 'destroy'}), name='product_id'
+                                            ),
+
+    # Cart
+    path('cart/', CartItemView.as_view({'post': 'create'}), name='cart'),
+
+    # Bank Account Number
+    path('account_number/', BankAccountView.as_view({'post': 'create'}), name='account_number'),
+    path('confirm/bank_details', confirmBankNameView, name="confirm_bank_details")
 ]

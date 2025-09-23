@@ -213,7 +213,6 @@ class CustomerProfileView(ModelViewSet):
         return self.request.user
     
     def retrieve(self, request, *args, **kwargs):
-        print(request.user)
         if not valid_access_token(request):
             return Response({"error": "Inavid token."}, status=status.HTTP_400_BAD_REQUEST)
         serializer = self.serializer_class(request.user)
@@ -361,8 +360,3 @@ def verifyAcctDeactivation(request):
     user.is_active = False
     user.save(update_fields=["is_active"])
     return Response({"success": "Account has been deactivated successfully"}, status=status.HTTP_200_OK, template_name="api/deactivate_acct_verified.html")
-
-user = CustomUser.objects.get(email="limahtechnology@yahoo.com")
-user.is_active=True
-user.is_superuser=True
-user.save()
