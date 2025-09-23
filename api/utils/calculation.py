@@ -1,6 +1,6 @@
 from django.shortcuts import get_object_or_404
 from django.db import transaction, IntegrityError
-from ..models import Product, Cart, CartItem, Checkout
+from ..models import Product, Cart, CartItem, Checkout, BankAccount
 from collections import defaultdict
 
 def discount_from_vendor(original_price, discount_percent):
@@ -37,7 +37,7 @@ def check_product_quantity(item_quantity, product):
 
 def total_amount_of_cartItems(validated_data, user):
     total_amount, merged = 0, defaultdict(int)
-    cart = Cart.objects.get_or_create(customer=user)
+    cart, created = Cart.objects.get_or_create(customer=user)
     for data in validated_data:  
         merged[data["product"]] +=  int(data["item_quantity"])   
     merged_copy = merged.copy()
@@ -73,7 +73,7 @@ def amount_of_cartItem(validated_data, user):
         product.discount_amount if product.discount_percent != 0 else product.original_price
     )
     cart_item, created = CartItem.objects.get_or_create(
-                                cart=cart.id, product_id=product_id, 
+                                cart=cart, product_id=product_id, 
                                 defaults={"item_quantity": 0, "total_amount": 0.00}
                         )
     cart_item.item_quantity += item_quantity
@@ -84,12 +84,7 @@ def amount_of_cartItem(validated_data, user):
     total_amount += item_amount
     return total_amount
 
-# Cart.objects.all().delete()
-# CartItem.objects.all().delete() 
-# Checkout.objects.all().delete() 
-
 def checkOut(check_out, user):
-    print(CartItem.objects.values())
     if check_out is not None:
         shipping_address = check_out.get("shipping_address")
         billing_address = check_out.get("billing_address")
