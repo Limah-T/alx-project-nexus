@@ -1,14 +1,15 @@
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.decorators import api_view
 from django.shortcuts import get_object_or_404
-
-from .serializers import CategorySerializer, ColorSerializer, ProductSerializer, ModifyProductSerializer
-from .models import Category, Color, Product, Order
+from .serializers import CategorySerializer, ColorSerializer, ProductSerializer, BankAccountSerializer, ModifyProductSerializer, CartItemSerializer
+from .models import Category, Color, Product, BankAccount
 from .utils.helper_functions import check_if_admin, request_instance
 from .utils.token import valid_access_token
-from .cloudinary import uploadImage, getImage, updateImage
-
+from .cloudinary import uploadImage, getImage
+from .utils.calculation import total_amount_of_cartItems, amount_of_cartItem, checkOut
+from .payments import getSubAccount, getBankCode, createSubAccount
 class CategoryView(ModelViewSet):
     serializer_class = CategorySerializer
     lookup_field = "id"
@@ -187,7 +188,7 @@ class ProductView(ModelViewSet):
     lookup_field = "id"
 
     def get_queryset(self):
-        query = Product.objects.all().order_by("-date_added")
+        query = Product.objects.filter(stock__gte=1, category__is_active=True).order_by("-date_added")
         return query
 
     def create(self, request, *args, **kwargs):
@@ -195,7 +196,7 @@ class ProductView(ModelViewSet):
             return Response({"error": "Invalid Token."}, status=status.HTTP_400_BAD_REQUEST)
         if request.user.role != "vendor":
             return Response({"error": "Permission denied, not a vendor account."}, status=status.HTTP_400_BAD_REQUEST)
-        
+        get_object_or_404(BankAccount, vendor=request.user)
         serializer = self.serializer_class(data=request.data, many=request_instance(request))
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -259,3 +260,70 @@ class ProductView(ModelViewSet):
             return Response({"error": "Permission denied."}, status=status.HTTP_400_BAD_REQUEST)
         product.delete()
         return Response({"success": "Product has been deleted successfully."}, status=status.HTTP_200_OK)
+
+
+"""****************************************CartItem************************************************"""
+class CartItemView(ModelViewSet):
+    serializer_class = CartItemSerializer
+
+    def create(self, request, *args, **kwargs):
+        if not valid_access_token(request.auth):
+            return Response({"error": "Invalid Token."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        many = request_instance(request)
+        serializer = self.serializer_class(data=request.data, many=many)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        if isinstance(data, list):
+            total_amount = total_amount_of_cartItems(data, request.user)
+            if not total_amount:
+                return Response({"error": "One of the product's quantity is greater than the stock quantity."}, status=status.HTTP_400_BAD_REQUEST)            
+        else:
+            total_amount = amount_of_cartItem(data, request.user)
+            if not total_amount:
+                return Response({"error": "Product's quantity is greater than the stock quantity."}, status=status.HTTP_400_BAD_REQUEST)
+        print(total_amount)
+        # check_out = data.get("checkout")
+        # checkout = checkOut(check_out, request.user)
+        return Response({"success": "Cart created successfully."}, status=status.HTTP_200_OK)
+
+class BankAccountView(ModelViewSet):
+    serializer_class = BankAccountSerializer
+
+    def create(self, request, *args, **kwargs):
+        if not valid_access_token(request.auth):
+            return Response({"error": "Invalid Token."}, status=status.HTTP_400_BAD_REQUEST)
+        if request.user.role != "vendor":
+            return Response({"error": "Permission denied, not a vendor account."}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        print(serializer.validated_data)
+        BankAccount.objects.create(
+            vendor=request.user, number=data["number"], name=data["account_name"],
+            bank_name=data["bank_name"], bank_code=data["bank_code"], 
+            subaccount_code=data["subaccount_code"]
+        )
+        print(BankAccount.objects.values())
+        return Response({"message": f"Please confirm name -- {data['account_name']}"}, status=status.HTTP_200_OK)
+
+@api_view(http_method_names=["GET"])
+def confirmBankNameView(request):
+    if not valid_access_token(request.auth):
+        return Response({"error": "Invalid Token."}, status=status.HTTP_400_BAD_REQUEST)
+    if request.user.role != "vendor":
+       return Response({"error": "Permission denied, not a vendor account."}, status=status.HTTP_400_BAD_REQUEST)
+    bank_account = get_object_or_404(BankAccount, vendor=request.user)
+    if bank_account.verified:
+        return Response({"success": "Account has been verified already."}, status=status.HTTP_200_OK)
+    confirmation = request.query_params.get("confirmation")
+    if confirmation is None:
+        return Response({"error": "Confirmation is missing."}, status=status.HTTP_400_BAD_REQUEST) 
+    if confirmation.lower() in ["false", "no", "0"]:
+        bank_account.delete()
+        return Response({"success": "Please enter the right account number."}, status=status.HTTP_406_NOT_ACCEPTABLE)
+    if confirmation.lower() in ["true", "yes", "1"]:
+        bank_account.verified = True
+        bank_account.save(update_fields=["verified"])
+        return Response({"success": "Bank account has been added successfully."}, status=status.HTTP_200_OK)
+
