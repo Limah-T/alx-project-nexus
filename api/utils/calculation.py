@@ -62,7 +62,6 @@ def total_amount_of_cartItems(validated_data, user):
 
 def amount_of_cartItem(validated_data, user):
     cart, created = Cart.objects.get_or_create(customer=user)
-    print(cart)
     total_amount = 0
     product_id = validated_data["product"]
     item_quantity = validated_data["item_quantity"]
@@ -84,6 +83,24 @@ def amount_of_cartItem(validated_data, user):
     total_amount += item_amount
     return total_amount
 
+def update_product_in_cart(product_id, total_quantity, cart): 
+    total_amount = 0
+    # category has been checked to be active in the caller function   
+    product = Product.objects.get(id=str(product_id))
+    item_amount = total_quantity * (
+        product.discount_amount if product.discount_percent != 0 else product.original_price
+    )
+    cart_item, created = CartItem.objects.get_or_create(cart=cart, product_id=product_id,
+                                    defaults={"item_quantity": 0, "total_amount": 0.00})
+    cart_item.item_quantity = total_quantity
+    cart_item.total_amount = cart_item.item_quantity * (
+        product.discount_amount if product.discount_percent != 0 else product.original_price
+    )
+    cart_item.save()
+    total_amount += item_amount
+    print(total_amount)
+    return cart_item
+
 def checkOut(check_out, user):
     if check_out is not None:
         shipping_address = check_out.get("shipping_address")
@@ -95,3 +112,5 @@ def checkOut(check_out, user):
         )
         return checkout
     return check_out
+
+

@@ -56,7 +56,10 @@ urlpatterns = [
                                             ),
 
     # Cart
-    path('cart/', CartItemView.as_view({'post': 'create'}), name='cart'),
+    path('cart/', CartItemView.as_view({'post': 'create', 'get':'retrieve', 'put': 'update', 
+                                        'patch': 'update', 'delete': 'destroy'}), 
+                                        name='cart'
+                                    ),
 
     # Bank Account Number
     path('account_number/', BankAccountView.as_view({'post': 'create'}), name='account_number'),

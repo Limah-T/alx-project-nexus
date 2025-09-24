@@ -172,9 +172,16 @@ class BankAccount(models.Model):
         super().save(*args, **kwargs)
 
 class Cart(models.Model):
+   STATUS_CHOICES = [
+        ("unpaid", "Unpaid"),
+        ("pending", "Pending"),
+        ("paid", "Paid"),
+    ]
    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
    customer = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='cart_items')
    updated_at = models.DateTimeField(auto_now=True)
+   status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="unpaid"
+    )
 
 class CartItem(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -182,6 +189,7 @@ class CartItem(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     item_quantity = models.PositiveIntegerField(default=1)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+
 
     @property
     def cal_total_amount(self):

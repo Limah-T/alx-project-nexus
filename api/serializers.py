@@ -130,6 +130,7 @@ class CartItemSerializer(serializers.Serializer):
         if value <= 0:
             raise serializers.ValidationError("Item quantity cannot be less than 0.")
         return value
+    
 
 class PaymentSerializer(serializers.Serializer):
     cart = serializers.UUIDField(read_only=True)
