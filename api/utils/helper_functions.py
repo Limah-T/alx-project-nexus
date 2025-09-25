@@ -1,7 +1,5 @@
-from ..models import CustomUser, BlaskListAccessToken, CartItem, Cart, Checkout, Product
-from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
-from rest_framework_simplejwt.tokens import AccessToken
-from django.shortcuts import get_object_or_404
+from ..models import CustomUser, CartItem, Cart, Product, BankAccount, TransactionSplit
+from .calculation import vendor_payout_sale, vendor_payout
 from datetime import timedelta
 from django.utils import timezone
 from collections import defaultdict
@@ -39,7 +37,7 @@ def check_if_admin(user):
 
 def request_instance(request_body):
     many = True
-    if not isinstance(request_body.data, list):
+    if not isinstance(request_body, list):
         many = False
         return many
     else:
@@ -106,8 +104,9 @@ def update_list_of_cartItems(cart, product_data):
         try:
             cartItems = CartItem.objects.get(cart=cart, product=product)
             cartItems.item_quantity = total_quantity
+            cartItems.save(update_fields=["item_quantity"])
             cartItems.total_amount = cartItems.cal_total_amount
-            cartItems.save(update_fields=["item_quantity", "total_amount"])
+            cartItems.save(update_fields=["total_amount"])
         except CartItem.DoesNotExist:
             cartItems = update_product_in_cart(product, total_quantity, cart)
         finally:
@@ -133,3 +132,48 @@ def remove_a_product_from_cart(cart, product_id):
         return False
     cartItems.delete()
     return True
+    
+def check_list_of_products_quantity(cart, product_data):
+    merged_data = merge_duplicate_products_id(product_data)
+    total_amount = 0
+    for product_id in merged_data:
+        quantity = merged_data[product_id]
+        try:
+            cartItems = CartItem.objects.filter(cart=cart, product=str(product_id))
+            for item in cartItems:
+                if item.product.stock >= quantity:
+                    item.item_quantity = quantity
+                    item.save(update_fields=["item_quantity"])
+                    item.total_amount = item.cal_total_amount
+                    item.save(update_fields=["total_amount"])
+                    total_amount += item.total_amount
+        except Exception as e:
+            print(str(e))
+            return False
+    return total_amount
+    
+def vendors_details(product_data):
+    vendors = {}
+    vendors_merged_data = defaultdict(int)
+    merged_data = merge_duplicate_products_id(product_data)
+    for product in merged_data:
+        quantity = merged_data[product]
+        vendor_product = Product.objects.get(id=str(product))
+        vendor = BankAccount.objects.get(vendor=vendor_product.vendor)
+        if vendor_product.discount_percent != 0:
+            discount_amount = vendor_payout_sale(original_price=vendor_product.original_price,
+                                               discount_percent=vendor_product.discount_percent
+                                               )
+            vendor_amount = discount_amount * quantity
+        else:
+            vendor_amount = vendor_payout(float(vendor_product.original_price))
+
+        vendors_merged_data[vendor.subaccount_code] += vendor_amount
+    print(vendors_merged_data)    
+    all_vendors = vendors_merged_data.copy()
+    print(all_vendors)
+    
+    return all_vendors
+
+
+

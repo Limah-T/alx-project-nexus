@@ -3,7 +3,7 @@ from django.urls import path
 
 from .auth_views import CustomerRegView, VendorRegView, LoginView, ResetPasswordView, SetPasswordView, ChangePasswordView, LogoutView, verifyRegEmail, verifyPasswordResetEmail, verifyEmailUpdate, verifyAcctDeactivation, CustomerProfileView, VendorProfileView
 
-from .views import CategoryView, ColorView, ProductView, CartItemView, BankAccountView, confirmBankNameView
+from .views import CategoryView, ColorView, ProductView, CartItemView, BankAccountView, confirmBankNameView, PaymentView, VerifyPaymentReference
 
 from .admin_views import ModifyUserView
 
@@ -63,5 +63,9 @@ urlpatterns = [
 
     # Bank Account Number
     path('account_number/', BankAccountView.as_view({'post': 'create'}), name='account_number'),
-    path('confirm/bank_details', confirmBankNameView, name="confirm_bank_details")
+    path('confirm/bank_details', confirmBankNameView, name="confirm_bank_details"),
+
+    # Payment Transactions
+    path('payment/', PaymentView.as_view(), name="payment"),
+    path('verify/payment/<str:reference>', VerifyPaymentReference.as_view(), name="verify_payment")
 ]

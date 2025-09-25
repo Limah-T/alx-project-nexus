@@ -1,15 +1,16 @@
 from rest_framework.viewsets import ModelViewSet
+from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import api_view
 from django.shortcuts import get_object_or_404
 from .serializers import CategorySerializer, ColorSerializer, ProductSerializer, BankAccountSerializer, ModifyProductSerializer, CartItemSerializer
 from .models import Category, Color, Product, BankAccount, CartItem, Cart
-from .utils.helper_functions import check_if_admin, request_instance, check_if_list_of_products_exist, check_if_user_cart_is_active, check_if_products_exist_in_cart, update_list_of_cartItems, check_if_product_exist, retrive_cartItems, retrieve_single_cartItem, remove_products_from_cart, remove_a_product_from_cart
+from .utils.helper_functions import check_if_admin, request_instance, check_if_list_of_products_exist, check_if_user_cart_is_active, check_if_products_exist_in_cart, update_list_of_cartItems, check_if_product_exist, retrive_cartItems, retrieve_single_cartItem, remove_products_from_cart, remove_a_product_from_cart, check_list_of_products_quantity, vendors_details
 from .utils.token import valid_access_token
 from .cloudinary import uploadImage, getImage
 from .utils.calculation import total_amount_of_cartItems, amount_of_cartItem, update_product_in_cart, checkOut
-from .payments import getSubAccount, getBankCode, createSubAccount
+from .payments import transactionSplit, initializeTransaction, paymentVerify
 
 class CategoryView(ModelViewSet):
     serializer_class = CategorySerializer
@@ -331,13 +332,13 @@ class CartItemView(ModelViewSet):
     
     def destroy(self, request, *args, **kwargs):
         if not valid_access_token(request.auth):
-            return Response({"error": "Invalid Token."}, status=400)
-        many = request_instance(request)       
+            return Response({"error": "Invalid Token."}, status=400)      
         cart = check_if_user_cart_is_active(user=request.user)
         if not cart:
             return Response({"error": "Cart is empty!."}, status=400)
         if not check_if_products_exist_in_cart(cart):
             return Response({"error": "Please add products to cart."}, status=400)
+        many = request_instance(request) 
         if many:
             if not remove_products_from_cart(cart, request.data):
                 return Response({"error": "Some or all of the provided product IDs do not exist in the cart!"}, status=400)
@@ -371,10 +372,12 @@ def confirmBankNameView(request):
     if request.user.role != "vendor":
        return Response({"error": "Permission denied, not a vendor account."}, status=400)
     bank_account = get_object_or_404(BankAccount, vendor=request.user)
+    if bank_account.vendor.role != "vendor":
+        return Response({"error": "Permission denied, not a vendor account"}, status=400)
     if bank_account.verified:
         return Response({"success": "Account has been verified already."}, status=200)
     confirmation = request.query_params.get("confirmation")
-    if confirmation is None:
+    if confirmation.lower() not in ['false', 'no', '0', 'true', '1', 'yes']:
         return Response({"error": "Confirmation is missing."}, status=400) 
     if confirmation.lower() in ["false", "no", "0"]:
         bank_account.delete()
@@ -382,5 +385,61 @@ def confirmBankNameView(request):
     if confirmation.lower() in ["true", "yes", "1"]:
         bank_account.verified = True
         bank_account.save(update_fields=["verified"])
+        transaction_split = transactionSplit(name=str(bank_account.vendor.business_name),
+                                vendor=bank_account.vendor,
+                                subaccount_code=bank_account.subaccount_code
+                                )
+        if not transaction_split:
+            return Response({"error": "Can't create a transaction split"}, status=400)
         return Response({"success": "Bank account has been added successfully."}, status=200)
+
+# cart = serializers.UUIDField(read_only=True)
+# amount = serializers.DecimalField(read_only=True, max_digits=10, decimal_places=2)
+# method = serializers.CharField(read_only=True, required=False)
+# status = serializers.CharField(read_only=True, required=False)
+# transaction_id = serializers.CharField(read_only=True, required=False)
+# date = serializers.DateTimeField(read_only=True)    
+class PaymentView(APIView):
+    http_method_names = ["post"]
+    serializer_class = CartItemSerializer
+
+    def post(self, request, *args, **kwargs):
+        if not valid_access_token(request.auth):
+            return Response({"error": "Invalid Token."}, status=400)
+        cart = check_if_user_cart_is_active(user=request.user)
+        if not cart:
+            return Response({"error": "Cart is empty!."}, status=400)
+        if not check_if_products_exist_in_cart(cart):
+            return Response({"error": "Please add products to cart."}, status=400)
+        many = request_instance(request.data)
+        if many:
+            if not check_if_list_of_products_exist(request.data):
+                return Response({"error": "Some or all of the provided product IDs do not exist."},status=400)
+            if not check_list_of_products_quantity(cart, request.data):
+                return Response({"error": "Few or some of the products quantity is higher than the stock quantity"})
+            payment_transaction = initializeTransaction(
+                                    product_data=request.data,
+                                    many=many
+                                )
+            if not payment_transaction:
+                return Response({"error": "error"}, status=400)
+            reference = payment_transaction["data"]["reference"]
+            print(reference)
+        return Response({"success": "Payment made successfully"}, status=200)
+
+
+class VerifyPaymentReference(APIView):
+    http_method_names = ["post"]
+
+    def post(self, request, *args, **kwargs):
+        reference = kwargs.get("reference")
+        if reference is None:
+            return Response({"error": "Reference ID is missing"}, status=400)
+        response = paymentVerify(reference)
+        if not response:
+            return Response({"error": "Payment has not been verified"}, status=400)
+        print(response)
+        return Response({"success": "Payment has been verified successfully."}, status=200)
+
+
 

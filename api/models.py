@@ -4,7 +4,7 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.core.validators import MinValueValidator, MaxValueValidator
 from phonenumber_field.modelfields import PhoneNumberField
 
-import uuid
+import uuid, os
 
 class CustomManager(BaseUserManager):
     def create_user(self, first_name, last_name, email, phone_number, address, business_address, business_name,  password=None, **extra_kwargs):
@@ -215,8 +215,24 @@ class Payment(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     method = models.CharField(max_length=8, default="card")
     status = models.CharField(max_length=10, default="pending")
-    transaction_id = models.CharField(max_length=30, unique=True)
+    transaction_id = models.CharField(max_length=30, unique=True, blank=True)
     date = models.DateTimeField(auto_now_add=True)
+
+class TransactionSplit(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    vendor = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name="split")
+    
+    # Paystack split details
+    split_code = models.CharField(max_length=50, unique=True, blank=True, null=True)
+    share_percentage = models.PositiveIntegerField(
+                                default=int(os.environ.get("VENDOR_PERCENTAGE"))
+                                )  # vendor share
+    platform_share = models.PositiveIntegerField(
+                                default=int(os.environ.get("PLATFORM_PERCENTAGE"))
+                                )    # platform share
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
 
 class Order(models.Model):
    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False) 
