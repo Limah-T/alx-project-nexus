@@ -212,10 +212,10 @@ class Checkout(models.Model):
 class Payment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     cart = models.ForeignKey(CartItem, on_delete=models.CASCADE, related_name='payments')
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     method = models.CharField(max_length=8, default="card")
     status = models.CharField(max_length=10, default="pending")
-    transaction_id = models.CharField(max_length=30, unique=True, blank=True)
+    reference = models.CharField(max_length=30, unique=True, blank=True)
     date = models.DateTimeField(auto_now_add=True)
 
 class TransactionSplit(models.Model):

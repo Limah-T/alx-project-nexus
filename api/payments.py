@@ -16,11 +16,13 @@ def getSubAccount(subaccount_id):
 
     try:
         response = requests.get(url=f"{SUBACCOUNT_URL}/{subaccount_id}", headers=headers)
-        data = response.json()["data"]
+        if response.status_code != 200:
+            print("error", response.json())
+            return False
     except Exception as e:
         print(str(e))
         return False
-    return data
+    return response.json()
 
 def getBankCode(bank_name):
     headers = {
@@ -106,18 +108,20 @@ def initializeTransaction(many, product_data):
 
     all_vendors = vendors_details(product_data)
     for transaction in all_vendors:
+        print(transaction)
         amount = all_vendors[transaction]
         vendor = BankAccount.objects.get(subaccount_code=transaction)
+        print(getSubAccount(vendor.subaccount_code))
         payload = {
             "amount": amount * 100,
             "email": vendor.vendor.email,
-            "subaccount": transaction
+            "subaccount": str(vendor.subaccount_code)
         }
 
         try:
             response = requests.post(url=TRANSACTION_INITIALIZATION, headers=headers, json=payload)
             if response.status_code != 200:
-                print("Error", response.json())
+                print("Error from here", response.json())
                 return False
         except Exception as e:
             print("Exception", str(e))
@@ -140,3 +144,4 @@ def paymentVerify(reference):
         print("Exception", str(e))
         return False
     return response.json()
+

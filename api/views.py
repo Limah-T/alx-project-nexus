@@ -5,7 +5,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from django.shortcuts import get_object_or_404
 from .serializers import CategorySerializer, ColorSerializer, ProductSerializer, BankAccountSerializer, ModifyProductSerializer, CartItemSerializer
-from .models import Category, Color, Product, BankAccount, CartItem, Cart
+from .models import Category, Color, Product, BankAccount, CartItem, Payment, Cart, Order
 from .utils.helper_functions import check_if_admin, request_instance, check_if_list_of_products_exist, check_if_user_cart_is_active, check_if_products_exist_in_cart, update_list_of_cartItems, check_if_product_exist, retrive_cartItems, retrieve_single_cartItem, remove_products_from_cart, remove_a_product_from_cart, check_list_of_products_quantity, vendors_details
 from .utils.token import valid_access_token
 from .cloudinary import uploadImage, getImage
@@ -417,16 +417,13 @@ class PaymentView(APIView):
                 return Response({"error": "Some or all of the provided product IDs do not exist."},status=400)
             if not check_list_of_products_quantity(cart, request.data):
                 return Response({"error": "Few or some of the products quantity is higher than the stock quantity"})
-            payment_transaction = initializeTransaction(
-                                    product_data=request.data,
-                                    many=many
-                                )
+            payment_transaction = initializeTransaction(product_data=request.data, many=many)
             if not payment_transaction:
                 return Response({"error": "error"}, status=400)
             reference = payment_transaction["data"]["reference"]
             print(reference)
-        return Response({"success": "Payment made successfully"}, status=200)
-
+            payment = Payment.objects.create(cart=check_if_products_exist_in_cart(cart), reference=reference)            
+        return Response({"success": payment.id}, status=200)
 
 class VerifyPaymentReference(APIView):
     http_method_names = ["post"]
@@ -435,11 +432,25 @@ class VerifyPaymentReference(APIView):
         reference = kwargs.get("reference")
         if reference is None:
             return Response({"error": "Reference ID is missing"}, status=400)
-        response = paymentVerify(reference)
+        payment = get_object_or_404(Payment, id=str(reference))
+        response = paymentVerify(payment.reference)
         if not response:
             return Response({"error": "Payment has not been verified"}, status=400)
-        print(response)
-        return Response({"success": "Payment has been verified successfully."}, status=200)
-
-
-
+        
+        cart = Cart.objects.get(id=payment.cart.cart.id)
+        cart.status = "paid"
+        cart.save()
+        if payment.status == "verified":
+            order_id = Order.objects.get(payment=payment)
+            return Response({"order": order_id.id}, status=200)
+        amount = response['data']['amount']
+        payment.method = response['data']['channel']
+        payment.amount = amount / 100
+        payment.cart.cart.status = "paid"
+        payment.status = "verified"
+        payment.save()
+        order = Order.objects.create(
+            payment=payment,
+            payment_status = payment.status
+        )
+        return Response({"success": order.id}, status=200)

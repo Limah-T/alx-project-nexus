@@ -67,5 +67,5 @@ urlpatterns = [
 
     # Payment Transactions
     path('payment/', PaymentView.as_view(), name="payment"),
-    path('verify/payment/<str:reference>', VerifyPaymentReference.as_view(), name="verify_payment")
+    path('verify/payment/<uuid:reference>', VerifyPaymentReference.as_view(), name="verify_payment")
 ]

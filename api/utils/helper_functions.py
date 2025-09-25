@@ -63,10 +63,10 @@ def check_if_user_cart_is_active(user):
 
 def check_if_products_exist_in_cart(cart): 
     try:
-        CartItem.objects.get(cart=cart)
+        cartItem = CartItem.objects.get(cart=cart)
     except CartItem.DoesNotExist:
         return False
-    return True
+    return cartItem
     
 def check_if_list_of_products_exist(product_data):
     merged_data = merge_duplicate_products_id(product_data)
@@ -153,13 +153,14 @@ def check_list_of_products_quantity(cart, product_data):
     return total_amount
     
 def vendors_details(product_data):
-    vendors = {}
     vendors_merged_data = defaultdict(int)
     merged_data = merge_duplicate_products_id(product_data)
     for product in merged_data:
         quantity = merged_data[product]
         vendor_product = Product.objects.get(id=str(product))
         vendor = BankAccount.objects.get(vendor=vendor_product.vendor)
+        print(vendor)
+        print(vendor.subaccount_code)
         if vendor_product.discount_percent != 0:
             discount_amount = vendor_payout_sale(original_price=vendor_product.original_price,
                                                discount_percent=vendor_product.discount_percent
@@ -169,10 +170,8 @@ def vendors_details(product_data):
             vendor_amount = vendor_payout(float(vendor_product.original_price))
 
         vendors_merged_data[vendor.subaccount_code] += vendor_amount
-    print(vendors_merged_data)    
-    all_vendors = vendors_merged_data.copy()
-    print(all_vendors)
-    
+    all_vendors = vendors_merged_data.copy()  
+    print(all_vendors)  
     return all_vendors
 
 
