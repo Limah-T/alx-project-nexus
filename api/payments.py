@@ -1,7 +1,13 @@
+from .models import TransactionSplit, BankAccount
+from .utils.helper_functions import vendors_details
 import requests, os
-PAYMENT_SECRET_KEY = os.environ.get("PAYMENT_TEST_SECRET_KEY")
+
+PAYMENT_SECRET_KEY = os.environ.get("PAYMENT_SECRET_KEY")
 SUBACCOUNT_URL = os.environ.get("SUBACCOUNT_ENDPOINT")
 BANK_CODE_URL = os.environ.get("BANK_CODE")
+TRANSACTION_SPLIT = os.environ.get("TRANSACTION_SPLIT")
+TRANSACTION_INITIALIZATION = os.environ.get("TRANSACTION_INITIALIZATION")
+PAYMENT_VERIFY = os.environ.get("PAYMENT_VERIFY")
 
 def getSubAccount(subaccount_id):
     headers = {
@@ -10,11 +16,13 @@ def getSubAccount(subaccount_id):
 
     try:
         response = requests.get(url=f"{SUBACCOUNT_URL}/{subaccount_id}", headers=headers)
-        data = response.json()["data"]
+        if response.status_code != 200:
+            print("error", response.json())
+            return False
     except Exception as e:
         print(str(e))
         return False
-    return data
+    return response.json()
 
 def getBankCode(bank_name):
     headers = {
@@ -42,13 +50,98 @@ def createSubAccount(business_name, bank_code, account_no):
         "business_name": business_name,
         "settlement_bank": bank_code,
         "account_number": account_no,
-        "percentage_charge": 10
+        "percentage_charge": int(os.environ.get("PLATFORM_PERCENTAGE"))
     }
 
     try:
         response = requests.post(url=SUBACCOUNT_URL, headers=headers, json=payload)
-        data = response.json()["data"]
+        data = response.json()
+        print(data)
     except Exception as e:
         print(str(e))
         return False
     return data
+
+def createTransactionSplit(name, subaccount_code):
+    headers = {
+        "Authorization": f"Bearer {PAYMENT_SECRET_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "name": name,
+        "type": "percentage",
+        "currency": "NGN",
+        "subaccounts": [
+            {
+                "subaccount": subaccount_code,
+                "share": int(os.environ.get("VENDOR_PERCENTAGE"))
+            }
+        ]
+    }
+
+    try:
+        response = requests.post(url=TRANSACTION_SPLIT, headers=headers, json=payload)
+        if response.status_code != 200:
+            print("Error", response.json())
+            return False
+    except Exception as e:
+        print("From Exception", str(e))
+        return False
+    return response.json()
+
+def transactionSplit(name, vendor, subaccount_code):
+    response = createTransactionSplit(name, subaccount_code)
+    if not response:
+        return False
+    split_code = response["data"]["split_code"]
+    TransactionSplit.objects.create(
+        vendor=vendor, split_code=split_code,
+    )
+    return True
+
+def initializeTransaction(many, product_data):
+    headers = {
+        "Authorization": f"Bearer {PAYMENT_SECRET_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    all_vendors = vendors_details(product_data)
+    for transaction in all_vendors:
+        print(transaction)
+        amount = all_vendors[transaction]
+        vendor = BankAccount.objects.get(subaccount_code=transaction)
+        print(getSubAccount(vendor.subaccount_code))
+        payload = {
+            "amount": amount * 100,
+            "email": vendor.vendor.email,
+            "subaccount": str(vendor.subaccount_code)
+        }
+
+        try:
+            response = requests.post(url=TRANSACTION_INITIALIZATION, headers=headers, json=payload)
+            if response.status_code != 200:
+                print("Error from here", response.json())
+                return False
+        except Exception as e:
+            print("Exception", str(e))
+            return False
+    print(response.json())
+    return response.json()
+
+
+def paymentVerify(reference):
+    headers = {
+        "Authorization": f"Bearer {PAYMENT_SECRET_KEY}"
+    }
+
+    try:
+        response = requests.get(url=f"{PAYMENT_VERIFY}/{reference}", headers=headers)
+        if response.status_code != 200:
+            print("error", response.json())
+            return False
+    except Exception as e:
+        print("Exception", str(e))
+        return False
+    return response.json()
+

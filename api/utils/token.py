@@ -43,6 +43,7 @@ def black_list_user_tokens(user):
     user_tokens = OutstandingToken.objects.filter(user=user)
     for token in user_tokens:
         BlacklistedToken.objects.get_or_create(token=token)
+        BlaskListAccessToken.objects.get_or_create(jti=token)
 
 def valid_access_token(auth_token):
     try:  # parse JWT

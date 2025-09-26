@@ -5,6 +5,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view, authentication_classes, permission_classes, renderer_classes
 from rest_framework.renderers import TemplateHTMLRenderer, JSONRenderer
 from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.views import TokenRefreshView
 from django.contrib.auth.hashers import check_password
 
 from .auth_serializers import CustomerRegSerializer, VendorRegSerializer, LoginSerializer, ResetPasswordSerializer, SetPasswordSerializer, ChangePasswordSerializer, CustomerProfileSerializer
@@ -13,6 +14,12 @@ from .utils.helper_functions import check_email_id_exist_in_token, set_user_pass
 from .models import CustomUser, BlaskListAccessToken
 from .tasks import send_email
 import os
+
+class CustomTokenRefreshView(TokenRefreshView):
+
+    def post(self, request, *args, **kwargs):
+        black_list_user_tokens(user=request.user)
+        return super().post(request, *args, **kwargs)
 
 class CustomerRegView(APIView):
     http_method_names = ["post"]
@@ -34,7 +41,7 @@ class CustomerRegView(APIView):
             email=user.email
         )
         return Response({'message': 'please check your email for verification'}, 
-                        status=status.HTTP_200_OK)
+                        status=200)
 
 class VendorRegView(APIView):
     http_method_names = ["post"]
@@ -56,7 +63,7 @@ class VendorRegView(APIView):
             email=user.email
         )
         return Response({'message': 'please check your email for verification'}, 
-                        status=status.HTTP_200_OK)
+                        status=200)
 
 @api_view(http_method_names=["GET"])
 @authentication_classes([])
@@ -65,23 +72,24 @@ class VendorRegView(APIView):
 def verifyRegEmail(request):
     token = request.GET.get("token") or request.query_params.get("token")
     if token is None:
-        return Response({"error": "Token is missing."}, status=status.HTTP_400_BAD_REQUEST, 
-                        template_name="api/invalid_token.html")
+        return Response({"error": "Token is missing."}, 
+                        template_name="api/invalid_token.html", status=400)
     payload = decode_token(token)
     if not payload:
-        return Response({"error": "Invalid Token."}, status=status.HTTP_400_BAD_REQUEST, 
-                        template_name="api/invalid_token.html")
+        return Response({"error": "Invalid Token."}, 
+                        template_name="api/invalid_token.html", status=400)
     email, id= payload.get("sub") , payload.get("iss")
     if not email or not id:
-        return Response({"error": "Invalid token."}, status=status.HTTP_400_BAD_REQUEST, 
-                        template_name="api/invalid_token.html")
+        return Response({"error": "Invalid token."}, 
+                        template_name="api/invalid_token.html", status=400)
     user = check_email_id_exist_in_token(email, id)
     if not user:
-        return Response({"error": "Invalid Token"}, status=status.HTTP_400_BAD_REQUEST, 
-                        template_name="api/invalid_token.html")
+        return Response({"error": "Invalid Token"}, 
+                        template_name="api/invalid_token.html", status=400)
     user.email_verified = True
     user.save(update_fields=["email_verified"])
-    return Response({"success": "Email verified successfully."}, status=status.HTTP_200_OK, template_name="api/email_verified.html")
+    return Response({"success": "Email verified successfully."}, 
+                    template_name="api/email_verified.html", status=200)
   
 class LoginView(APIView):
     http_method_names = ['post']
@@ -93,10 +101,11 @@ class LoginView(APIView):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        black_list_user_tokens(user=data["user"])    
         return Response(
-                        {'access_token': data['access'],
-                         'refresh_token': data['refresh']
-                        }, status=status.HTTP_200_OK
+                        {'access': data['access'],
+                         'refresh': data['refresh']
+                        }, status=200
         )
     
 class ResetPasswordView(APIView):
@@ -118,7 +127,7 @@ class ResetPasswordView(APIView):
             context={"verification_link": verification_link, "name": f"{user.first_name}"}, 
             email=user.email)
         return Response({'message': 'Please check your email for verification'}, 
-                        status=status.HTTP_200_OK
+                        status=200
         )
 
 @api_view(http_method_names=["GET"])
@@ -128,24 +137,26 @@ class ResetPasswordView(APIView):
 def verifyPasswordResetEmail(request):
     token = request.GET.get("token") or request.query_params.get("token")
     if token is None:
-        return Response({"error": "Token is missing"}, status=status.HTTP_400_BAD_REQUEST, template_name="api/invalid_token.html")
+        return Response({"error": "Token is missing"}, 
+                        template_name="api/invalid_token.html", status=400)
     payload = decode_token(token)
     if not payload:
-        return Response({"error": "Invalid Token"}, status=status.HTTP_400_BAD_REQUEST, 
-                        template_name="api/invalid_token.html")
+        return Response({"error": "Invalid Token"}, 
+                        template_name="api/invalid_token.html", status=400)
     email, id = payload.get("sub"), payload.get("iss")
     if not email or not id:
-        return Response({"error": "Invalid token."}, status=status.HTTP_400_BAD_REQUEST, 
-                        template_name="api/invalid_token.html")
+        return Response({"error": "Invalid token."}, 
+                        template_name="api/invalid_token.html", status=400)
     user = check_email_id_exist_in_token(email, id)
     if not user:
-        return Response({"error": "Invalid Token"}, status=status.HTTP_400_BAD_REQUEST, 
-                        template_name="api/invalid_token.html")
+        return Response({"error": "Invalid Token"}, 
+                        template_name="api/invalid_token.html", status=400)
     can_reset = set_user_password_reset_time(user)
     if not can_reset:
-        return Response({"error": "Invalid Token"}, status=status.HTTP_400_BAD_REQUEST,
-                        template_name="api/invalid_token.html")
-    return Response({"success": "Email verified successfully."}, status=status.HTTP_200_OK, template_name="api/email_verified.html")
+        return Response({"error": "Invalid Token"}, 
+                        template_name="api/invalid_token.html", status=400)
+    return Response({"success": "Email verified successfully."}, 
+                    template_name="api/email_verified.html", status=200)
 
 class SetPasswordView(APIView):
     http_method_names = ['post']
@@ -164,7 +175,7 @@ class SetPasswordView(APIView):
         user.save(update_fields=["password", "reset_password", "time_reset"])
         black_list_user_tokens(user)
         return Response({'message': 'Password have been reset successfully.'}, 
-                        status=status.HTTP_200_OK
+                        status=200
         )
  
 class ChangePasswordView(APIView):   
@@ -173,21 +184,21 @@ class ChangePasswordView(APIView):
 
     def post(self, request, *args, **kwargs):
         if not valid_access_token(request.auth):
-            return Response({"error": "Inavid token."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Inavid token."}, status=400)
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
         old_password = serializer.validated_data['old_password']
         new_password = serializer.validated_data['new_password']
         if not check_password(old_password, request.user.password):
             return Response({"error": "Old password is incorrect."}, 
-                            status=status.HTTP_400_BAD_REQUEST
+                            status=400
         )
         if old_password == new_password:
             return Response({'error': 'Old and New password cannot be thesame.'}, 
-                            status=status.HTTP_400_BAD_REQUEST
+                            status=400
         )
         return Response({'success': 'Password has been changed successfully.'}, 
-                        status=status.HTTP_200_OK
+                        status=200
         )
 
 class LogoutView(APIView):
@@ -200,9 +211,9 @@ class LogoutView(APIView):
             jti = token['jti']
             BlaskListAccessToken.objects.create(jti=jti)
         except Exception:
-            return Response({'error': 'Invalid Token'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Invalid Token'}, status=400)
         
-        return Response({'success': 'Logged out.'}, status=status.HTTP_200_OK)
+        return Response({'success': 'Logged out.'}, status=200)
     
     
 """****************************Profile Section******************************************"""
@@ -214,14 +225,15 @@ class CustomerProfileView(ModelViewSet):
     
     def retrieve(self, request, *args, **kwargs):
         if not valid_access_token(request):
-            return Response({"error": "Inavid token."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Inavid token."}, status=400)
         serializer = self.serializer_class(request.user)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.data, status=200)
     
     def update(self, request, *args, **kwargs):
         if not valid_access_token(request):
-            return Response({"error": "Inavid token."}, status=status.HTTP_400_BAD_REQUEST)
-        serializer = self.serializer_class(data=request.data, instance=self.get_object(), partial=True)
+            return Response({"error": "Inavid token."}, status=400)
+        serializer = self.serializer_class(data=request.data, instance=self.get_object(),
+                                        partial=True)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         if user.pending_email:
@@ -234,14 +246,12 @@ class CustomerProfileView(ModelViewSet):
                     context={"verification_link": verification_link, "name": user.first_name},
                     email=user.pending_email
             )
-            return Response({"message": "Please check your email to verify."}, 
-                            status=status.HTTP_200_OK
-            )
-        return Response({"success": "Profile updated successfully."}, status=status.HTTP_200_OK)
+            return Response({"message": "Please check your email to verify."}, status=200)
+        return Response({"success": "Profile updated successfully."}, status=200)
     
     def destroy(self, request, *args, **kwargs):
         if not valid_access_token(request):
-            return Response({"error": "Inavid token."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Inavid token."}, status=400)
         user = request.user
         token = encode_token(user.id, user.email)
         verification_link = f"{os.environ.get("APP_DOMAIN")}/verify/acct_deactivation?token={token}"   
@@ -252,7 +262,7 @@ class CustomerProfileView(ModelViewSet):
                 email=user.email
             )
         return Response({"message": "Please check your email to verify account deactivation."}, 
-                        status=status.HTTP_200_OK
+                        status=200
         )
 
 class VendorProfileView(ModelViewSet):
@@ -263,14 +273,15 @@ class VendorProfileView(ModelViewSet):
     
     def retrieve(self, request, *args, **kwargs):
         if not valid_access_token(request):
-            return Response({"error": "Inavid token."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Inavid token."}, status=400)
         serializer = self.serializer_class(request.user)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.data, status=200)
     
     def update(self, request, *args, **kwargs):
         if not valid_access_token(request):
-            return Response({"error": "Inavid token."}, status=status.HTTP_400_BAD_REQUEST)
-        serializer = self.serializer_class(data=request.data, instance=self.get_object(), partial=True)
+            return Response({"error": "Inavid token."}, status=400)
+        serializer = self.serializer_class(data=request.data, instance=self.get_object(), 
+                                           partial=True)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         if user.pending_email:
@@ -284,13 +295,13 @@ class VendorProfileView(ModelViewSet):
                     email=user.pending_email
             )
             return Response({"message": "Please check your email to verify."}, 
-                            status=status.HTTP_200_OK
+                            status=200
             )
-        return Response({"success": "Profile updated successfully."}, status=status.HTTP_200_OK)
+        return Response({"success": "Profile updated successfully."}, status=200)
     
     def destroy(self, request, *args, **kwargs):
         if not valid_access_token(request):
-            return Response({"error": "Inavid token."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Inavid token."}, status=400)
         user = request.user
         token = encode_token(user.id, user.email)
         verification_link = f"{os.environ.get("APP_DOMAIN")}/verify/acct_deactivation?token={token}"   
@@ -300,7 +311,7 @@ class VendorProfileView(ModelViewSet):
                 email=user.email
             )
         return Response({"message": "Please check your email to verify account deactivation."}, 
-                        status=status.HTTP_200_OK
+                        status=200
         )
 
 @api_view(http_method_names=["GET"])
@@ -310,31 +321,31 @@ class VendorProfileView(ModelViewSet):
 def verifyEmailUpdate(request):
     token = request.query_params.get("token") or request.GET.get("token")
     if token is None:
-        return Response({"error": "Token is missing."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "Token is missing."}, status=400)
     payload = decode_token(token)
     if not payload:
-        return Response({"error": "Inavlid token"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "Inavlid token"}, status=400)
     pending_email = payload.get("sub")
     id = payload.get("iss")
     if not pending_email or not id:
-        return Response({"error": "Invalid token."}, status=status.HTTP_400_BAD_REQUEST, 
-                        template_name="api/invalid_token.html")
+        return Response({"error": "Invalid token."}, 
+                        template_name="api/invalid_token.html", status=400)
     try:
-        user = CustomUser.objects.get(pending_email=pending_email, is_active=True, email_verified=True)
+        user = CustomUser.objects.get(pending_email=pending_email, is_active=True, 
+                                      email_verified=True)
     except CustomUser.DoesNotExist:
-        return Response({"error": "Invalid token."}, status=status.HTTP_400_BAD_REQUEST,
-                        template_name="api/invalid_token.html")
+        return Response({"error": "Invalid token."},
+                        template_name="api/invalid_token.html", status=400)
     if str(user.id) != id:
-        return Response({"error": "Invalid token."}, status=status.HTTP_400_BAD_REQUEST, 
-                        template_name="api/invalid_token.html")
+        return Response({"error": "Invalid token."}, 
+                        template_name="api/invalid_token.html", status=400)
     if not user:
-        return Response({"error": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST,
-                        template_name="api/invalid_token.html")
-    user.email = pending_email
-    user.pending_email = None
+        return Response({"error": "Invalid token"},
+                        template_name="api/invalid_token.html", status=400)
+    user.email, user.pending_email = pending_email, None
     user.save(update_fields=["email", "pending_email"])
-    return Response({"success": "Email updated successfully."}, status=status.HTTP_200_OK,
-                    template_name="api/email_verified.html")
+    return Response({"success": "Email updated successfully."},
+                    template_name="api/email_verified.html", status=200)
 
 @api_view(http_method_names=["GET"])
 @authentication_classes([])
@@ -343,20 +354,20 @@ def verifyEmailUpdate(request):
 def verifyAcctDeactivation(request):
     token = request.query_params.get("token") or request.GET.get("token")
     if token is None:
-        return Response({"error": "Token is missing."}, status=status.HTTP_400_BAD_REQUEST,
+        return Response({"error": "Token is missing."}, status=400,
                             template_name="api/invalid_token.html")
     payload = decode_token(token)
     if not payload:
-        return Response({"error": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST, template_name="api/invalid_token.html")
+        return Response({"error": "Invalid token"}, status=400, template_name="api/invalid_token.html")
     email = payload.get("sub")
     id = payload.get("iss")
     if not email or not id:
-        return Response({"error": "Invalid token."}, status=status.HTTP_400_BAD_REQUEST, template_name="api/invalid_token.html")
+        return Response({"error": "Invalid token."}, status=400, template_name="api/invalid_token.html")
     user = check_email_id_exist_in_token(email, id)
     if not user:
-        return Response({"error": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST, template_name="api/invalid_token.html")
+        return Response({"error": "Invalid token"}, status=400, template_name="api/invalid_token.html")
     if not user.email_verified:
-        return Response({"error": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST, template_name="api/invalid_token.html")
+        return Response({"error": "Invalid token"}, status=400, template_name="api/invalid_token.html")
     user.is_active = False
     user.save(update_fields=["is_active"])
-    return Response({"success": "Account has been deactivated successfully"}, status=status.HTTP_200_OK, template_name="api/deactivate_acct_verified.html")
+    return Response({"success": "Account has been deactivated successfully"}, status=200, template_name="api/deactivate_acct_verified.html")

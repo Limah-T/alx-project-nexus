@@ -4,7 +4,7 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.core.validators import MinValueValidator, MaxValueValidator
 from phonenumber_field.modelfields import PhoneNumberField
 
-import uuid
+import uuid, os
 
 class CustomManager(BaseUserManager):
     def create_user(self, first_name, last_name, email, phone_number, address, business_address, business_name,  password=None, **extra_kwargs):
@@ -172,9 +172,16 @@ class BankAccount(models.Model):
         super().save(*args, **kwargs)
 
 class Cart(models.Model):
+   STATUS_CHOICES = [
+        ("unpaid", "Unpaid"),
+        ("pending", "Pending"),
+        ("paid", "Paid"),
+    ]
    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
    customer = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='cart_items')
    updated_at = models.DateTimeField(auto_now=True)
+   status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="unpaid"
+    )
 
 class CartItem(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -182,6 +189,7 @@ class CartItem(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     item_quantity = models.PositiveIntegerField(default=1)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+
 
     @property
     def cal_total_amount(self):
@@ -204,11 +212,27 @@ class Checkout(models.Model):
 class Payment(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     cart = models.ForeignKey(CartItem, on_delete=models.CASCADE, related_name='payments')
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    amount = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     method = models.CharField(max_length=8, default="card")
     status = models.CharField(max_length=10, default="pending")
-    transaction_id = models.CharField(max_length=30, unique=True)
+    reference = models.CharField(max_length=30, unique=True, blank=True)
     date = models.DateTimeField(auto_now_add=True)
+
+class TransactionSplit(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    vendor = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name="split")
+    
+    # Paystack split details
+    split_code = models.CharField(max_length=50, unique=True, blank=True, null=True)
+    share_percentage = models.PositiveIntegerField(
+                                default=int(os.environ.get("VENDOR_PERCENTAGE"))
+                                )  # vendor share
+    platform_share = models.PositiveIntegerField(
+                                default=int(os.environ.get("PLATFORM_PERCENTAGE"))
+                                )    # platform share
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
 
 class Order(models.Model):
    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False) 

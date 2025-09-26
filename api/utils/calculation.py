@@ -1,27 +1,33 @@
 from django.shortcuts import get_object_or_404
 from django.db import transaction, IntegrityError
-from ..models import Product, Cart, CartItem, Checkout
+from ..models import Product, Cart, CartItem, Checkout, BankAccount
 from collections import defaultdict
+import os
 
 def discount_from_vendor(original_price, discount_percent):
     discounted_percentage = discount_percent / 100 # e.g 5/100
-    discount_price = original_price * discounted_percentage # 50,000 * 0.05
+    discount_price = float(original_price) * discounted_percentage # 50,000 * 0.05
     return discount_price # 2,500
 
 def customer_payout_sale(original_price, discount_percent):
     customer_payout = original_price - discount_from_vendor(original_price, discount_percent) # 50,00 - 2,500
     return customer_payout 
 
-def platform_payout_sale(original_price):
-    platform_percentage = 10 / 100  # e.g 10/100
-    discount = original_price * platform_percentage # 50,000 * 0.1
+def platform_payout(original_price):
+    platform_percentage = int(os.environ.get("PLATFORM_PERCENTAGE")) / 100  # e.g 10/100
+    discount = float(original_price) * platform_percentage # 50,000 * 0.1
     return discount # 5,000
 
 def vendor_payout_sale(original_price, discount_percent):
     vendor_discount = discount_from_vendor(original_price, discount_percent)
     vendor_price = original_price - vendor_discount # 50,000 - 2,000
-    amount = vendor_price - platform_payout_sale(original_price) # 47,500 - 5,000
+    amount = vendor_price - platform_payout(original_price) # 47,500 - 5,000
     return amount #42,500
+
+def vendor_payout(original_price):
+    platform_price = platform_payout(original_price)
+    vendor_amount = original_price - platform_price
+    return vendor_amount
 
 @transaction.atomic()
 def check_product_quantity(item_quantity, product):
@@ -37,7 +43,7 @@ def check_product_quantity(item_quantity, product):
 
 def total_amount_of_cartItems(validated_data, user):
     total_amount, merged = 0, defaultdict(int)
-    cart = Cart.objects.get_or_create(customer=user)
+    cart, created = Cart.objects.get_or_create(customer=user)
     for data in validated_data:  
         merged[data["product"]] +=  int(data["item_quantity"])   
     merged_copy = merged.copy()
@@ -56,13 +62,12 @@ def total_amount_of_cartItems(validated_data, user):
         cart_item.total_amount = cart_item.item_quantity * (
             product.discount_amount if product.discount_percent != 0 else product.original_price
         )
-        cart_item.save()
+        cart_item.save(update_fields=["item_quantity", "total_amount"])
         total_amount += item_amount
     return total_amount
 
 def amount_of_cartItem(validated_data, user):
     cart, created = Cart.objects.get_or_create(customer=user)
-    print(cart)
     total_amount = 0
     product_id = validated_data["product"]
     item_quantity = validated_data["item_quantity"]
@@ -73,7 +78,7 @@ def amount_of_cartItem(validated_data, user):
         product.discount_amount if product.discount_percent != 0 else product.original_price
     )
     cart_item, created = CartItem.objects.get_or_create(
-                                cart=cart.id, product_id=product_id, 
+                                cart=cart, product_id=product_id, 
                                 defaults={"item_quantity": 0, "total_amount": 0.00}
                         )
     cart_item.item_quantity += item_quantity
@@ -84,12 +89,25 @@ def amount_of_cartItem(validated_data, user):
     total_amount += item_amount
     return total_amount
 
-# Cart.objects.all().delete()
-# CartItem.objects.all().delete() 
-# Checkout.objects.all().delete() 
+def update_product_in_cart(product_id, total_quantity, cart): 
+    total_amount = 0
+    # category has been checked to be active in the caller function   
+    product = Product.objects.get(id=str(product_id))
+    item_amount = total_quantity * (
+        product.discount_amount if product.discount_percent != 0 else product.original_price
+    )
+    cart_item, created = CartItem.objects.get_or_create(cart=cart, product_id=product_id,
+                                    defaults={"item_quantity": 0, "total_amount": 0.00})
+    cart_item.item_quantity = total_quantity
+    cart_item.total_amount = total_quantity * (
+        product.discount_amount if product.discount_percent != 0 else product.original_price
+    )
+    cart_item.save(update_fields=["item_quantity", "total_amount"])
+    total_amount += item_amount
+    print(total_amount)
+    return cart_item
 
 def checkOut(check_out, user):
-    print(CartItem.objects.values())
     if check_out is not None:
         shipping_address = check_out.get("shipping_address")
         billing_address = check_out.get("billing_address")
@@ -100,3 +118,5 @@ def checkOut(check_out, user):
         )
         return checkout
     return check_out
+
+

@@ -122,7 +122,7 @@ class CheckoutSerializer(serializers.Serializer):
 
 class CartItemSerializer(serializers.Serializer):
     id = serializers.UUIDField(read_only=True)
-    customer = serializers.UUIDField(read_only=True)
+    cart = serializers.UUIDField(read_only=True)
     product = serializers.UUIDField()
     item_quantity = serializers.IntegerField()
 
@@ -130,14 +130,6 @@ class CartItemSerializer(serializers.Serializer):
         if value <= 0:
             raise serializers.ValidationError("Item quantity cannot be less than 0.")
         return value
-
-class PaymentSerializer(serializers.Serializer):
-    cart = serializers.UUIDField(read_only=True)
-    amount = serializers.DecimalField(read_only=True, max_digits=10, decimal_places=2)
-    method = serializers.CharField(read_only=True, required=False)
-    status = serializers.CharField(read_only=True, required=False)
-    transaction_id = serializers.CharField(read_only=True, required=False)
-    date = serializers.DateTimeField(read_only=True)
 
 class BankAccountSerializer(serializers.Serializer):
     vendor = serializers.UUIDField(read_only=True)
@@ -158,13 +150,22 @@ class BankAccountSerializer(serializers.Serializer):
             account_no=attrs["number"]
         )
         if not subaccount:
-            raise 
+            raise serializers.ValidationError("error")
         attrs.update({
             "bank_code": bank_code,
-            "subaccount_code": subaccount["subaccount_code"],
-            "account_name": subaccount["account_name"]
+            "subaccount_code": subaccount["data"]["subaccount_code"],
+            "account_name": subaccount["data"]["account_name"]
         })
         return attrs
+    
+class PaymentSerializer(serializers.Serializer):
+    cart = serializers.UUIDField(read_only=True)
+    amount = serializers.DecimalField(read_only=True, max_digits=10, decimal_places=2)
+    method = serializers.CharField(read_only=True, required=False)
+    status = serializers.CharField(read_only=True, required=False)
+    transaction_id = serializers.CharField(read_only=True, required=False)
+    date = serializers.DateTimeField(read_only=True)
+
 
 
 
