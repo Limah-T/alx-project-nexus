@@ -338,7 +338,7 @@ class CartItemView(ModelViewSet):
         if not valid_access_token(request.auth):
             return Response({"error": "Invalid Token."}, status=400)
         
-        many = request_instance(request)
+        many = request_instance(request.data)
         serializer = self.serializer_class(data=request.data, many=many)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data

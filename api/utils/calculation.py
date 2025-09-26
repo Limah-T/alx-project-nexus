@@ -15,7 +15,7 @@ def customer_payout_sale(original_price, discount_percent):
 
 def platform_payout(original_price):
     platform_percentage = int(os.environ.get("PLATFORM_PERCENTAGE")) / 100  # e.g 10/100
-    discount = float(original_price) * platform_percentage # 50,000 * 0.1
+    discount = original_price * platform_percentage # 50,000 * 0.1
     return discount # 5,000
 
 def vendor_payout_sale(original_price, discount_percent):
@@ -43,7 +43,10 @@ def check_product_quantity(item_quantity, product):
 
 def total_amount_of_cartItems(validated_data, user):
     total_amount, merged = 0, defaultdict(int)
-    cart, created = Cart.objects.get_or_create(customer=user)
+    try:
+        cart = Cart.objects.get(customer=user, status="unpaid")
+    except Exception:
+        cart, created = Cart.objects.get_or_create(customer=user)
     for data in validated_data:  
         merged[data["product"]] +=  int(data["item_quantity"])   
     merged_copy = merged.copy()

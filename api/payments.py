@@ -110,6 +110,7 @@ def initializeTransaction(many, product_data):
     for transaction in all_vendors:
         print(transaction)
         amount = all_vendors[transaction]
+        print(amount)
         vendor = BankAccount.objects.get(subaccount_code=transaction)
         print(getSubAccount(vendor.subaccount_code))
         payload = {

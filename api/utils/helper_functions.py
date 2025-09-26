@@ -157,17 +157,18 @@ def vendors_details(product_data):
     merged_data = merge_duplicate_products_id(product_data)
     for product in merged_data:
         quantity = merged_data[product]
+        print(quantity)
         vendor_product = Product.objects.get(id=str(product))
         vendor = BankAccount.objects.get(vendor=vendor_product.vendor)
         print(vendor)
         print(vendor.subaccount_code)
         if vendor_product.discount_percent != 0:
-            discount_amount = vendor_payout_sale(original_price=vendor_product.original_price,
-                                               discount_percent=vendor_product.discount_percent
+            discount_amount = vendor_payout_sale(original_price=float(vendor_product.   original_price), discount_percent=vendor_product.discount_percent
                                                )
             vendor_amount = discount_amount * quantity
         else:
-            vendor_amount = vendor_payout(float(vendor_product.original_price))
+            vendor_amount = quantity * vendor_payout(float(vendor_product.original_price))
+            print(vendor_amount)
 
         vendors_merged_data[vendor.subaccount_code] += vendor_amount
     all_vendors = vendors_merged_data.copy()  
