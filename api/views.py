@@ -3,22 +3,47 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.decorators import api_view
+
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
 from django.shortcuts import get_object_or_404
-from .serializers import CategorySerializer, ColorSerializer, ProductSerializer, BankAccountSerializer, ModifyProductSerializer, CartItemSerializer
-from .models import Category, Color, Product, BankAccount, CartItem, Payment, Cart, Order
-from .utils.helper_functions import check_if_admin, request_instance, check_if_list_of_products_exist, check_if_user_cart_is_active, check_if_products_exist_in_cart, update_list_of_cartItems, check_if_product_exist, retrive_cartItems, retrieve_single_cartItem, remove_products_from_cart, remove_a_product_from_cart, check_list_of_products_quantity, vendors_details
+
+from .serializers import (CategorySerializer, ColorSerializer, 
+                          ProductSerializer, BankAccountSerializer, 
+                          ModifyProductSerializer, CartItemSerializer
+                          )
+from .models import (Category, Color, Product, BankAccount, 
+                     CartItem, Payment, Cart, Order
+                    )
+from .custom_classes import CustomPageNumberPagination
+from .utils.helper_functions import (check_if_admin, 
+                                     request_instance,check_if_list_of_products_exist, check_if_user_cart_is_active, check_if_products_exist_in_cart, update_list_of_cartItems, check_if_product_exist, retrive_cartItems, retrieve_single_cartItem, remove_products_from_cart, remove_a_product_from_cart, check_list_of_products_quantity, vendors_details
+                                    )
 from .utils.token import valid_access_token
 from .cloudinary import uploadImage, getImage
-from .utils.calculation import total_amount_of_cartItems, amount_of_cartItem, update_product_in_cart, checkOut
+from .utils.calculation import (total_amount_of_cartItems, 
+                                amount_of_cartItem, 
+                                update_product_in_cart, 
+                                checkOut
+                            )
 from .payments import transactionSplit, initializeTransaction, paymentVerify
 
 class CategoryView(ModelViewSet):
     serializer_class = CategorySerializer
     lookup_field = "id"
+    filter_backends = [
+                        DjangoFilterBackend, 
+                        SearchFilter,
+                        OrderingFilter
+                    ]
+    filterset_fields = ["name"]
+    search_fields = ["name"]
+    pagination_class = CustomPageNumberPagination
+    ordering = ["name"]
 
     def get_queryset(self):
         query = Category.objects.filter(is_active=True)
-        return query.order_by("-date")
+        return query
     
     def create(self, request, *args, **kwargs):
         if not valid_access_token(request.auth):
@@ -39,8 +64,15 @@ class CategoryView(ModelViewSet):
     def list(self, request, *args, **kwargs):
         if not valid_access_token(request.auth):
             return Response({"error": "Invalid Token."}, status=400)
-        serializer = self.serializer_class(self.get_queryset(), many=True)
-        return Response(serializer.data, status=200)
+        queryset = self.filter_queryset(self.get_queryset())  # <-- applies filter + search + ordering
+
+        page = self.paginate_queryset(queryset)  # <-- applies pagination
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({"data": serializer.data}, status=200)
     
     def retrieve(self, request, *args, **kwargs):
         if not valid_access_token(request.auth):
@@ -53,8 +85,7 @@ class CategoryView(ModelViewSet):
             category = Category.objects.get(id=id, is_active=True)
         except Category.DoesNotExist:
             return Response({"error": "Category ID does not exist."}, status=400)
-        # all_products = Product.objects.filter(category=category)
-        # serializer = ProductSerializer(all_products, many=True)
+        
         serializer = self.serializer_class(category)
         return Response(serializer.data, status=200)
     
@@ -99,10 +130,19 @@ class CategoryView(ModelViewSet):
 class ColorView(ModelViewSet):
     serializer_class = ColorSerializer
     lookup_field = "id"
+    filter_backends = [
+                        DjangoFilterBackend, 
+                        SearchFilter,
+                        OrderingFilter
+                    ]
+    filterset_fields = ["name"]
+    search_fields = ["name"]
+    pagination_class = CustomPageNumberPagination
+    ordering = ["name"]
 
     def get_queryset(self):
         query = Color.objects.all()
-        return query.order_by("-date")
+        return query
     
     def create(self, request, *args, **kwargs):
         if not valid_access_token(request.auth):
@@ -126,9 +166,16 @@ class ColorView(ModelViewSet):
         
         if not check_if_admin(request.user):
             return Response({"error": "You do not have the pernmission to perform this action"}, status=400)
-         
-        serializer = self.serializer_class(self.get_queryset(), many=True)
+        queryset = self.filter_queryset(self.get_queryset())  # <-- applies filter + search + ordering
+
+        page = self.paginate_queryset(queryset)  # <-- applies pagination
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data, status=200)
+
     
     def retrieve(self, request, *args, **kwargs):
         if not valid_access_token(request.auth):
@@ -188,9 +235,18 @@ class ColorView(ModelViewSet):
 class ProductView(ModelViewSet):
     serializer_class = ProductSerializer
     lookup_field = "id"
+    filter_backends = [
+                        DjangoFilterBackend, 
+                        SearchFilter,
+                        OrderingFilter
+                    ]
+    fiterset_fields = ["name", "description", "original_price", "discount_amount"]
+    search_fields = ["name", "description", "original_price", "discount_amount"]
+    pagination_class = CustomPageNumberPagination
+    ordering = ["original_price"]
 
     def get_queryset(self):
-        query = Product.objects.filter(stock__gte=1, category__is_active=True).order_by("-date_added")
+        query = Product.objects.filter(stock__gte=1, category__is_active=True)
         return query
 
     def create(self, request, *args, **kwargs):
@@ -220,7 +276,14 @@ class ProductView(ModelViewSet):
     def list(self, request, *args, **kwargs):
         if not valid_access_token(request.auth):
             return Response({"error": "Invalid Token."}, status=400)
-        serializer = self.serializer_class(self.get_queryset(), many=True)
+        queryset = self.filter_queryset(self.get_queryset())  # <-- applies filter + search + ordering
+
+        page = self.paginate_queryset(queryset)  # <-- applies pagination
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data, status=200)
     
     def retrieve(self, request, *args, **kwargs):
@@ -392,13 +455,7 @@ def confirmBankNameView(request):
         if not transaction_split:
             return Response({"error": "Can't create a transaction split"}, status=400)
         return Response({"success": "Bank account has been added successfully."}, status=200)
-
-# cart = serializers.UUIDField(read_only=True)
-# amount = serializers.DecimalField(read_only=True, max_digits=10, decimal_places=2)
-# method = serializers.CharField(read_only=True, required=False)
-# status = serializers.CharField(read_only=True, required=False)
-# transaction_id = serializers.CharField(read_only=True, required=False)
-# date = serializers.DateTimeField(read_only=True)    
+ 
 class PaymentView(APIView):
     http_method_names = ["post"]
     serializer_class = CartItemSerializer
@@ -435,22 +492,27 @@ class VerifyPaymentReference(APIView):
         payment = get_object_or_404(Payment, id=str(reference))
         response = paymentVerify(payment.reference)
         if not response:
-            return Response({"error": "Payment has not been verified"}, status=400)
-        
+            return Response({"error": "Payment has not been verified"}, status=400)        
         cart = Cart.objects.get(id=payment.cart.cart.id)
         cart.status = "paid"
-        cart.save()
+        cart.save(update_fields=["status"])
         if payment.status == "verified":
             order_id = Order.objects.get(payment=payment)
             return Response({"order": order_id.id}, status=200)
         amount = response['data']['amount']
         payment.method = response['data']['channel']
         payment.amount = amount / 100
-        payment.cart.cart.status = "paid"
         payment.status = "verified"
         payment.save()
-        order = Order.objects.create(
-            payment=payment,
-            payment_status = payment.status
-        )
+        order = Order.objects.create(payment=payment, payment_status = payment.status) 
         return Response({"success": order.id}, status=200)
+    
+class CustomerDashboard(APIView):
+    http_method_names = ["get"]
+
+    def get(self, request, *args, **kwargs):
+        if not valid_access_token(request.auth):
+            return Response({"error": "Invalid Token."}, status=400)    
+            
+
+    

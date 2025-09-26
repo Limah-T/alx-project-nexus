@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     # Third part apps
     'rest_framework_simplejwt.token_blacklist',
     'phonenumber_field', 
+    'django_filters',
     
 ]
 
@@ -99,7 +100,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 LANGUAGE_CODE = 'en-us'
 
@@ -118,14 +118,18 @@ AUTH_USER_MODEL = 'api.CustomUser'
 
 # Rest framework authentication and permission configurations
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
+    'DEFAULT_AUTHENTICATION_CLASSES':[ 
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-
-    ),
-    'DEFAULT_PERMISSION_CLASSES': (
+    ],
+    
+    'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
-    )
+    ],
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+    ],
 }
+
 with open("private_key.pem", "rb") as file:
     private_key = file.read()
 
@@ -160,3 +164,11 @@ CLOUDINARY_STORAGE = {
 
 MEDIA_URL = '/media/'
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+# Redis for caching
+# CACHES = {
+#     "default": {
+#         "BACKEND": "django.core.cache.backends.redis",
+#         "LOCATION": env("REDIS_URL"),
+#     }
+# }
