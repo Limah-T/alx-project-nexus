@@ -1,5 +1,5 @@
 from .models import TransactionSplit, BankAccount
-from .utils.helper_functions import vendors_details
+from .utils.helper_functions import vendors_details, vendor_details
 import requests, os
 
 PAYMENT_SECRET_KEY = os.environ.get("PAYMENT_SECRET_KEY")
@@ -100,7 +100,7 @@ def transactionSplit(name, vendor, subaccount_code):
     )
     return True
 
-def initializeTransaction(many, product_data):
+def initializeTransactionVendors(product_data):
     headers = {
         "Authorization": f"Bearer {PAYMENT_SECRET_KEY}",
         "Content-Type": "application/json"
@@ -108,9 +108,7 @@ def initializeTransaction(many, product_data):
 
     all_vendors = vendors_details(product_data)
     for transaction in all_vendors:
-        print(transaction)
         amount = all_vendors[transaction]
-        print(amount)
         vendor = BankAccount.objects.get(subaccount_code=transaction)
         print(getSubAccount(vendor.subaccount_code))
         payload = {
@@ -129,6 +127,32 @@ def initializeTransaction(many, product_data):
             return False
     print(response.json())
     return response.json()
+
+def initializeTransaction(product_data):
+    headers = {
+        "Authorization": f"Bearer {PAYMENT_SECRET_KEY}",
+        "Content-Type": "application/json"
+    }
+    vendor = vendor_details(product_data)
+    vendor_bank_data = BankAccount.objects.get(subaccount_code=vendor["subaccount"])
+
+    payload = {
+            "amount": vendor["amount"] * 100,
+            "email": vendor_bank_data.vendor.email,
+            "subaccount": str(vendor["subaccount"])
+        }
+
+    try:
+        response = requests.post(url=TRANSACTION_INITIALIZATION, headers=headers, json=payload)
+        if response.status_code != 200:
+            print("Error from here", response.json())
+            return False
+    except Exception as e:
+        print("Exception", str(e))
+        return False
+    print(response.json())
+    return response.json()
+
 
 
 def paymentVerify(reference):

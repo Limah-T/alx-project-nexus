@@ -151,6 +151,23 @@ def check_list_of_products_quantity(cart, product_data):
             print(str(e))
             return False
     return total_amount
+
+def check_product_quantity(cart, product_data):
+    product_id = product_data["product"]
+    quantity = product_data["item_quantity"]
+    amount = 0
+    try:
+        item = CartItem.objects.get(cart=cart, product=str(product_id))       
+        if item.product.stock >= quantity:
+            item.item_quantity = quantity
+            item.save(update_fields=["item_quantity"])
+            item.total_amount = item.cal_total_amount
+            item.save(update_fields=["total_amount"])
+            amount += item.total_amount
+    except Exception as e:
+        print(str(e))
+        return False
+    return amount
     
 def vendors_details(product_data):
     vendors_merged_data = defaultdict(int)
@@ -160,20 +177,47 @@ def vendors_details(product_data):
         print(quantity)
         vendor_product = Product.objects.get(id=str(product))
         vendor = BankAccount.objects.get(vendor=vendor_product.vendor)
-        print(vendor)
-        print(vendor.subaccount_code)
         if vendor_product.discount_percent != 0:
             discount_amount = vendor_payout_sale(original_price=float(vendor_product.   original_price), discount_percent=vendor_product.discount_percent
                                                )
             vendor_amount = discount_amount * quantity
         else:
-            vendor_amount = quantity * vendor_payout(float(vendor_product.original_price))
-            print(vendor_amount)
+            vendor_amount = float(vendor_product.original_price) * quantity
 
         vendors_merged_data[vendor.subaccount_code] += vendor_amount
     all_vendors = vendors_merged_data.copy()  
-    print(all_vendors)  
     return all_vendors
+
+def vendor_details(product_data):
+    product = product_data["product"]
+    quantity = product_data["item_quantity"]
+    vendor_data = {}
+    vendor_product = Product.objects.get(id=str(product))
+    vendor = BankAccount.objects.get(vendor=vendor_product.vendor)
+    print(vendor)
+    print(vendor.subaccount_code)
+    if vendor_product.discount_percent != 0:
+        discount_amount = vendor_payout_sale(original_price=float(vendor_product.   original_price), discount_percent=vendor_product.discount_percent
+                                            )
+        vendor_amount = discount_amount * quantity
+    else:
+        vendor_amount = float(vendor_product.original_price) * quantity
+    vendor_data.update({"subaccount": vendor.subaccount_code, 
+                       "amount": vendor_amount,
+                       "email": vendor.vendor.email
+                       })
+    return vendor_data
+
+def deduct_product_quantity_after_payment(cart):
+    products = CartItem.objects.filter(cart=cart)
+    try:
+        for product in products:
+            quantity = Product.objects.get(id=product.product.id)
+            quantity.stock -= product.item_quantity
+            quantity.save(update_fields=["stock"])
+    except Exception:
+        return False
+    return quantity
 
 
 

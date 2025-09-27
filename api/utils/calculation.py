@@ -19,7 +19,10 @@ def platform_payout(original_price):
     return discount # 5,000
 
 def vendor_payout_sale(original_price, discount_percent):
-    vendor_discount = discount_from_vendor(original_price, discount_percent)
+    if discount_percent != 0:
+        vendor_discount = discount_from_vendor(original_price, discount_percent)
+    else:
+        vendor_discount = 0
     vendor_price = original_price - vendor_discount # 50,000 - 2,000
     amount = vendor_price - platform_payout(original_price) # 47,500 - 5,000
     return amount #42,500
@@ -43,8 +46,9 @@ def check_product_quantity(item_quantity, product):
 
 def total_amount_of_cartItems(validated_data, user):
     total_amount, merged = 0, defaultdict(int)
-    try:
-        cart = Cart.objects.get(customer=user, status="unpaid")
+    try:        
+        if not Cart.objects.filter(customer=user, status="unpaid").exists():
+            cart = Cart.objects.create(customer=user, status="unpaid")
     except Exception:
         cart, created = Cart.objects.get_or_create(customer=user)
     for data in validated_data:  
@@ -70,7 +74,7 @@ def total_amount_of_cartItems(validated_data, user):
     return total_amount
 
 def amount_of_cartItem(validated_data, user):
-    cart, created = Cart.objects.get_or_create(customer=user)
+    cart, created = Cart.objects.get_or_create(customer=user, status="unpaid")
     total_amount = 0
     product_id = validated_data["product"]
     item_quantity = validated_data["item_quantity"]
