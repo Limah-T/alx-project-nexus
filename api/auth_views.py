@@ -7,12 +7,21 @@ from rest_framework.renderers import TemplateHTMLRenderer, JSONRenderer
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from django.contrib.auth.hashers import check_password
+from django.db import transaction
 
-from .auth_serializers import CustomerRegSerializer, VendorRegSerializer, LoginSerializer, ResetPasswordSerializer, SetPasswordSerializer, ChangePasswordSerializer, CustomerProfileSerializer
-from .utils.token import encode_token, decode_token, black_list_user_tokens, valid_access_token
+from .auth_serializers import ( 
+                                CustomerRegSerializer, VendorRegSerializer, 
+                                LoginSerializer, ResetPasswordSerializer,
+                                SetPasswordSerializer, ChangePasswordSerializer, CustomerProfileSerializer
+                            )
+from .utils.token import (
+                            encode_token, decode_token, 
+                            black_list_user_tokens, 
+                            valid_access_token
+                        )
 from .utils.helper_functions import check_email_id_exist_in_token, set_user_password_reset_time
 from .models import CustomUser, BlaskListAccessToken
-from .tasks import send_email
+from api.tasks import send_email
 import os
 
 class CustomTokenRefreshView(TokenRefreshView):
@@ -32,14 +41,18 @@ class CustomerRegView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         token = encode_token(user.id, user.email)
-        verification_link = f"{os.environ.get("APP_DOMAIN")}/verify_email/register?token={token}"
-        send_email(
+        verification_link = f"{os.environ.get('APP_DOMAIN')}/verify_email/register?token={token}"
+         # Task will only be queued if the transaction commits successfully
+        transaction.on_commit(
+            lambda: send_email.delay(
             subject="Verify your email",
             txt_template="api/text_mails/signup_verification.txt",
             html_template="api/signup_verification.html",
             context={"verification_link": verification_link},
             email=user.email
         )
+        )
+        
         return Response({'message': 'please check your email for verification'}, 
                         status=200)
 
@@ -54,17 +67,20 @@ class VendorRegView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         token = encode_token(user.id, user.email)
-        verification_link = f"{os.environ.get("APP_DOMAIN")}/verify_email/register?{token}"
-        send_email(
-            subject="Verify your email",
-            txt_template="api/text_mails/signup_verification.txt",
-            html_template="api/signup_verification.html",
-            context={"verification_link": verification_link},
-            email=user.email
+        verification_link = f"{os.environ.get('APP_DOMAIN')}/verify_email/register?token={token}"
+        transaction.on_commit(
+            lambda: send_email.delay(
+                    subject="Verify your email",
+                    txt_template="api/text_mails/signup_verification.txt",
+                    html_template="api/signup_verification.html",
+                    context={"verification_link": verification_link},
+                    email=user.email
+            )
         )
+    
         return Response({'message': 'please check your email for verification'}, 
                         status=200)
-
+    
 @api_view(http_method_names=["GET"])
 @authentication_classes([])
 @permission_classes([])
@@ -119,8 +135,8 @@ class ResetPasswordView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["email"]
         token = encode_token(user.id, user.email)
-        verification_link = f"{os.environ.get("APP_DOMAIN")}/verify/password_reset?token={token}"
-        send_email(
+        verification_link = f"{os.environ.get('APP_DOMAIN')}/verify/password_reset?token={token}"
+        send_email.delay(
             subject="Verify your email",
             txt_template="api/text_mails/reset_password.txt",
             html_template="api/reset_password.html",
@@ -238,9 +254,9 @@ class CustomerProfileView(ModelViewSet):
         user = serializer.save()
         if user.pending_email:
             token = encode_token(user.id, user.pending_email)
-            verification_link = f"{os.environ.get("APP_DOMAIN")}/verify/email_update?token={token}"
+            verification_link = f"{os.environ.get('APP_DOMAIN')}/verify/email_update?token={token}"
             token = encode_token(user.id, user.pending_email)
-            send_email(
+            send_email.delay(
                     subject="Update your email", txt_template="api/text_mails/update_email.txt",
                     html_template="api/update_email.html", 
                     context={"verification_link": verification_link, "name": user.first_name},
@@ -254,8 +270,8 @@ class CustomerProfileView(ModelViewSet):
             return Response({"error": "Inavid token."}, status=400)
         user = request.user
         token = encode_token(user.id, user.email)
-        verification_link = f"{os.environ.get("APP_DOMAIN")}/verify/acct_deactivation?token={token}"   
-        send_email(
+        verification_link = f"{os.environ.get('APP_DOMAIN')}/verify/acct_deactivation?token={token}"   
+        send_email.delay(
                 subject="Deactivate your account?", txt_template="api/text_mails/deactivate_acct_alert.txt",
                 html_template="api/deactivate_acct_alert.html", 
                 context={"verification_link": verification_link, "name": user.first_name},
@@ -286,9 +302,9 @@ class VendorProfileView(ModelViewSet):
         user = serializer.save()
         if user.pending_email:
             token = encode_token(user.id, user.email)
-            verification_link = f"{os.environ.get("APP_DOMAIN")}/verify_email_update?token={token}"
+            verification_link = f"{os.environ.get('APP_DOMAIN')}/verify_email_update?token={token}"
             token = encode_token(user.id, user.pending_email)
-            send_email(
+            send_email.delay(
                     subject="Update your email", txt_template="api/text_mails/update_email.txt",
                     html_template="api/update_email.html", 
                     context={"verification_link": verification_link, "name": user.first_name},
@@ -304,8 +320,8 @@ class VendorProfileView(ModelViewSet):
             return Response({"error": "Inavid token."}, status=400)
         user = request.user
         token = encode_token(user.id, user.email)
-        verification_link = f"{os.environ.get("APP_DOMAIN")}/verify/acct_deactivation?token={token}"   
-        send_email(
+        verification_link = f"{os.environ.get('APP_DOMAIN')}/verify/acct_deactivation?token={token}"   
+        send_email.delay(
                 subject="Deactivate your account?", txt_template="api/text_mails/deactivate_acct_alert.txt", html_template="api/deactivate_acct_alert.html", 
                 context={"verification_link": verification_link, "name": user.first_name},
                 email=user.email
@@ -371,3 +387,5 @@ def verifyAcctDeactivation(request):
     user.is_active = False
     user.save(update_fields=["is_active"])
     return Response({"success": "Account has been deactivated successfully"}, status=200, template_name="api/deactivate_acct_verified.html")
+
+print(CustomUser.objects.values().count())

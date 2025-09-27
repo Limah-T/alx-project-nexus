@@ -66,14 +66,15 @@ WSGI_APPLICATION = 'ecommerce_backend.wsgi.application'
 
 # Database
 DATABASES = {
-    'default': {
-        'ENGINE': env('ENGINE'),
-        'NAME': env('NAME'),
-        'USER': env('USER'),
-        'PASSWORD': env('PASSWORD'),
-        'HOST': env('HOST'),
-        'PORT': env('PORT')
-    }
+    'default': env.db("DATABASE_URL")
+    # {
+    #     'ENGINE': env('ENGINE'),
+    #     'NAME': env('NAME'),
+    #     'USER': env('USER'),
+    #     'PASSWORD': env('PASSWORD'),
+    #     'HOST': env('HOST'),
+    #     'PORT': env('PORT')
+    # }
 }
 
 # Email configuration
@@ -166,20 +167,20 @@ MEDIA_URL = '/media/'
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 # Celery + Redis configuration
-# CELERY_BROKER_URL = f"{env('REDIS_URL')}/0"
+CELERY_BROKER_URL = env('RABBITMQ_URL', default="amqp://my_user1:Qltp%230619@127.0.0.1:5672/myvhost1")
 CELERY_RESULT_BACKEND = f"{env('REDIS_URL')}/0"
-CELERY_TASK_ALWAYS_EAGER = bool(env('CELERY_TASK_ALWAYS_EAGER'))
+CELERY_TASK_ALWAYS_EAGER = False
 CELERY_TASK_TIME_LIMIT = int(env('CELERY_TASK_TIME_LIMIT'))
 CELERY_TASK_SOFT_TIME_LIMIT = int(env('CELERY_TASK_SOFT_TIME_LIMIT'))
-CELERY_TASK_ACKS_LATE = bool(env('CELERY_TASK_ACKS_LATE'))
-CELERY_TASK_REJECT_ON_WORKER_LOST = bool('CELERY_TASK_REJECT_ON_WORKER_LOST ')
-CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = bool('CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP')
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 # Caching settings
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": f"{env('REDIS_URL')}",
+        "LOCATION": f"{env('REDIS_URL')}/0",
         "TIMEOUT": None,   # cache forever by default
     }
 }

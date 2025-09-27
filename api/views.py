@@ -7,6 +7,7 @@ from rest_framework.decorators import api_view
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.shortcuts import get_object_or_404
+from django.db import transaction
 
 from .serializers import (CategorySerializer, ColorSerializer, 
                           ProductSerializer, BankAccountSerializer, 
@@ -531,7 +532,3 @@ class CustomerDashboard(APIView):
         if not valid_access_token(request.auth):
             return Response({"error": "Invalid Token."}, status=400)    
             
-
-print(CartItem.objects.values())   
-print("***********************************")
-print(Payment.objects.values())

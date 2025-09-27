@@ -1,5 +1,6 @@
 desktop.ini/
 venv
+venv_ubuntu
 public_key.pem
 private_key.pem
 # Python

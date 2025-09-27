@@ -5,8 +5,9 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ecommerce_backend.settings')
 
 app = Celery('ecommerce_backend')
 
-# # Broker: RabbitMQ
-# app.conf.broker_url = 'amqp://myuser:mypassword@localhost:5672/myvhost'
+app.config_from_object('django.conf:settings', namespace='CELERY')
+# Broker: RabbitMQ
+app.conf.broker_url = os.environ.get("RABBITMQ_URL")
 
 # Backend: Redis
 app.conf.result_backend = os.environ.get("REDIS_URL")
@@ -21,5 +22,7 @@ app.conf.update(
     task_track_started=True,
     task_time_limit=300,  # seconds
 )
+
+app.autodiscover_tasks()
 
 
