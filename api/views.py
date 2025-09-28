@@ -492,10 +492,11 @@ class PaymentView(APIView):
                 return Response({"error": "Product quantity is higher than stock quantity"}, status=400)
             payment_transaction = initializeTransaction(product_data=request.data)
             reference = payment_transaction["data"]["reference"]
-            payment, created = Payment.objects.get_or_create(
-                                    cart=check_if_products_exist_in_cart(cart), 
-                                    defaults={"reference": reference}
-                                    )    
+        payment, created = Payment.objects.get_or_create(
+                                cart=check_if_products_exist_in_cart(cart), 
+                                defaults={"reference": reference}
+                                )
+                
         return Response({"url": payment_transaction["data"]["authorization_url"],
                          "payment_id": payment.id}, status=200)
 
