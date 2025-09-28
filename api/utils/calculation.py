@@ -43,12 +43,10 @@ def check_product_quantity(item_quantity, product):
 
 def total_amount_of_cartItems(validated_data, user):
     total_amount, merged = 0, defaultdict(int)
-    cart = Cart.objects.filter(customer=user, status="unpaid")
-    try:        
-        if cart != []:
-            cart = Cart.objects.create(customer=user, status="unpaid")
-    except Exception:
-        cart, created = Cart.objects.get_or_create(customer=user)
+    if not Cart.objects.filter(customer=user, status="unpaid").exists():
+        cart = Cart.objects.create(customer=user)
+    else:
+        cart = Cart.objects.get(customer=user, status="unpaid")
     for data in validated_data:  
         merged[data["product"]] +=  int(data["item_quantity"])   
     merged_copy = merged.copy()
