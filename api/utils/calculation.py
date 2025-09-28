@@ -36,12 +36,9 @@ def vendor_payout(original_price):
 def check_product_quantity(item_quantity, product):
     try:
         with transaction.atomic():
-            print("Stock:", product.stock, "item_quantity:", item_quantity)
             if product.stock >= item_quantity:
-                print("Can purchase")
                 return True
-    except IntegrityError as e:
-        print(str(e), "from transaction.atomic")
+    except IntegrityError:
         return False
 
 def total_amount_of_cartItems(validated_data, user):
@@ -111,7 +108,6 @@ def update_product_in_cart(product_id, total_quantity, cart):
     )
     cart_item.save(update_fields=["item_quantity", "total_amount"])
     total_amount += item_amount
-    print(total_amount)
     return cart_item
 
 def checkOut(check_out, user):

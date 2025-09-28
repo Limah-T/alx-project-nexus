@@ -1,167 +1,327 @@
-# alx-project-nexus
-Project Nexus is the ALX ProDev BE capstone project.
+# Nest – Multi-Vendor E-Commerce API
 
-# 🛒 E-Commerce Backend API
-
-This project is part of the **ALX ProDev Backend Program – Project Nexus Week**.  
-It simulates a **real-world e-commerce backend system**, focusing on scalability, security, and performance.  
-The backend supports **product catalog management, user authentication, and API endpoints for filtering, sorting, and pagination**.
+Nest is a production-ready multi-vendor e-commerce API.
+It allows vendors to upload products, customers to purchase and pay seamlessly, and automatically splits payment between the platform and vendors.
 
 ---
 
-## 📌 Overview
-The e-commerce backend provides the foundation for an online store.  
-It enables:
-- **Product and category management**
-- **User authentication and authorization**
-- **Robust APIs** for frontend integration  
-- **Optimized database queries** for scalability and performance  
+## 🚀 Tech Stack
+
+* **Backend**: Python, Django, Django REST Framework (DRF)
+* **Task Queue**: Celery + RabbitMQ + Redis
+* **Database**: PostgreSQL
+* **Media Storage**: Cloudinary
+* **Containerization**: Docker
 
 ---
 
-## 🎯 Project Goals
-- **CRUD APIs** for products, categories, and user authentication.  
-- **Filtering, Sorting, and Pagination** for efficient product discovery.  
-- **Database Optimization** using relational schema design and indexing.  
-- **API Documentation** with Swagger/OpenAPI for easy frontend consumption.  
+## 🔑 Main Features
+
+* **User Authentication & JWT** (Customer & Vendor roles)
+* **Email Verification & Password Reset**
+* **Product, Cart & Checkout Management**
+* **Payment Handling with Split Transactions**
+* **Task Scheduling (async emails, background jobs)**
+* **Filtering, Sorting & Pagination**
+* **Rate Limiting & Custom Error Handling**
 
 ---
 
-## ⚙️ Technologies Used
-- **Django** – Scalable backend framework.  
-- **PostgreSQL** – Relational database with indexing for performance.  
-- **JWT** – Secure user authentication.  
-- **Swagger/OpenAPI** – API documentation and testing.  
+## 📌 Endpoints Overview (with Examples)
+
+### **Authentication**
+
+#### Register Customer
+
+`POST /customer/register/`
+
+**Request**
+
+```json
+{
+  "first_name": "Jane",
+  "last_name": "Doe",
+  "address": "Surulere, Lagos",
+  "phone_number": "+2349184270428",
+  "email": "jane@example.com",
+  "password": "SecurePass123",
+
+}
+```
+
+**Response**
+
+```json
+{
+  "message": "Registration successful. Please verify your email."
+}
+```
 
 ---
 
-## 🔑 Key Features
-### 1. CRUD Operations
-- Create, Read, Update, Delete operations for **Products** and **Categories**.  
-- Secure **User Authentication & Management** using JWT.  
+#### Register Vendor
 
-### 2. API Features
-- **Filtering & Sorting** – filter products by category and sort by price.  
-- **Pagination** – handle large datasets efficiently with paginated responses.  
+`POST /customer/register/`
 
-### 3. API Documentation
-- Swagger/OpenAPI integrated for live API testing and documentation.  
+**Request**
 
----
+```json
+{
+  "first_name": "Jane",
+  "last_name": "Doe",
+  "business_address": "Surulere, Lagos",
+  "business_name": "Baby palm ventures",
+  "phone_number": "+2349184270428",
+  "email": "jane@example.com",
+  "password": "SecurePass123",
 
-## 🚀 Implementation Process
-### Git Commit Workflow
-- `feat:` set up Django project with PostgreSQL  
-- `feat:` implement user authentication with JWT  
-- `feat:` add product APIs with filtering and pagination  
-- `feat:` integrate Swagger documentation for API endpoints  
-- `perf:` optimize database queries with indexing  
-- `docs:` add API usage instructions in Swagger  
+}
+```
 
----
+**Response**
 
-## 📤 Deployment
-- API is hosted with live documentation available via **Swagger/Postman**.  
-- Example: `https://your-deployment-url.com/api/docs/`  
+```json
+{
+  "message": "Registration successful. Please verify your email."
+}
+```
 
 ---
 
-## ✅ Evaluation Criteria
-1. **Functionality**  
-   - CRUD APIs for products, categories, and authentication.  
-   - Filtering, sorting, and pagination implemented correctly.  
 
-2. **Code Quality**  
-   - Clean, maintainable, and well-structured code.  
-   - Proper indexing and optimized database queries.  
+#### Login
 
-3. **User Experience**  
-   - Comprehensive and user-friendly API documentation.  
-   - Secure authentication.  
+`POST /login/`
 
-4. **Version Control**  
-   - Frequent, descriptive Git commit messages.  
-   - Well-organized repository structure.  
+**Request**
+
+```json
+{
+  "email": "jane@example.com",
+  "password": "SecurePass123"
+}
+```
+
+**Response**
+
+```json
+{
+  "access": "eyJ0eXAiOiJKV1QiLCJh...",
+  "refresh": "eyJhbGciOiJIUzI1..."
+}
+```
 
 ---
 
-## 📖 How to Run Locally
+#### Password Reset (Request Link)
+
+`POST /password/reset/`
+
+**Request**
+
+```json
+{
+  "email": "jane@example.com"
+}
+```
+
+**Response**
+
+```json
+{
+  "message": "Password reset link sent to your email."
+}
+```
+
+---
+
+### **Profiles**
+
+#### Get Vendor Profile
+
+`GET /vendor/profile/`
+
+**Response**
+
+```json
+{
+  "id": 1,
+  "email": "vendor@example.com",
+  "store_name": "Best Electronics",
+  "created_at": "2025-09-01T10:00:00Z"
+}
+```
+
+---
+
+### **Catalog**
+
+#### Create Product (Vendor)
+
+`POST /product/` # Only Vendors with Bank account details
+
+**Request**
+
+```json
+{
+  "name": "Wireless Mouse",
+  "price": 25.50,
+  "category": "category-UUID",
+  "color": 1, # Optional
+  "stock": 50,
+  "description": "Ergonomic wireless mouse with USB receiver.",
+  "image": "product-image",
+  "original_price": 135000.00,
+  "discount_percent": 20, #Optional
+}
+```
+
+**Response**
+
+```json
+{
+  "id": 101,
+  "name": "Wireless Mouse",
+  "price": 25.50,
+  "category": 2,
+  "color": 1,
+  "stock": 50,
+  "description": "Ergonomic wireless mouse with USB receiver.",
+  "image": "https-url-for-the-product-image",
+  "original_price": 135000.00,
+  "discount_percent": 20, #Optional
+  "created_at": "2025-09-27T15:00:00Z"
+}
+```
+
+---
+
+### **Cart & Checkout**
+
+#### Add to Cart
+
+`POST /cart/`
+
+**Request**
+
+```json
+{
+  "product": "product-UUID",
+  "item_quantity": 2
+} OR
+[
+   {
+      "product": "product-UUID",
+      "item_quantity": 2
+   },
+   {
+      "product": "product2-UUID",
+      "item_quantity": 5
+   },
+   "checkout": {
+      "billing_address": "your billing address",
+      "shipping_address": "your shipping address"
+   }
+]
+```
+
+**Response**
+
+```json
+{
+  "success": "Cart has been created successfully",
+}
+```
+
+---
+
+### **Payment**
+
+#### Initialize Payment
+
+`POST /payment/`
+
+**Request**
+
+```json
+]
+    {
+        "product": "1f850fbb-f589-4dc1-be43-dc7a4783b8fb",
+        "item_quantity": 2
+    }
+    {
+        "product": "1f850fbb-f589-4dc1-be43-dc7a4783b8fb",
+        "item_quantity": 1
+    }
+
+]
+```
+
+**Response**
+
+```json
+{
+  "url": "authorization-url-for-payment",
+  "payment_id": "payment-UUID"
+}
+
+```
+
+---
+
+#### Verify Payment
+
+`POST /verify/payment/payment-UUID`
+
+**Response**
+
+```json
+{
+  "status": "success",
+  "order": "order-UUID"
+}
+```
+
+---
+
+## 🛠️ Setup (Development)
+
 ```bash
-# 1. Clone repository
-git clone https://github.com/your-username/ecommerce-backend.git
-cd ecommerce-backend
+# Clone the repo
+git clone <repo_url>
+cd nest
 
-# 2. Create virtual environment
+# Create virtual environment
 python -m venv venv
-source venv/bin/activate   # for Linux/Mac
-venv\Scripts\activate      # for Windows
+source venv/bin/activate   # Linux/Mac
+venv\Scripts\activate      # Windows
 
-# 3. Install dependencies
+# Install dependencies
 pip install -r requirements.txt
 
-# 4. Set up PostgreSQL database
-# update DATABASES in settings.py with your credentials
-
-# 5. Run migrations
+# Run migrations
 python manage.py migrate
 
-# 6. Create superuser
-python manage.py createsuperuser
-
-# 7. Run server
+# Start services
+redis-server
+rabbitmq-server
+celery -A ecommerce_backend worker -l info
 python manage.py runserver
+```
 
-## 🗄️ Database Schema
+---
 
-The relational database schema is designed for performance, scalability, and normalization.  
+## 📖 Notes
 
-### Tables
-1. **Users**
-   - id (PK)
-   - username
-   - email
-   - password (hashed)
-   - is_vendor (boolean, default=False)
-   - is_active
-   - created_at, updated_at
+* Ensure `.env` contains valid configs (DB, Redis, RabbitMQ, Cloudinary, Email).
+* Celery must be running for async tasks (email sending, etc).
+* Docker can be used for containerized setup.
 
-2. **Categories**
-   - id (PK)
-   - name
-   - description
-   - created_at, updated_at
+---
 
-3. **Products**
-   - id (PK)
-   - name
-   - description
-   - price
-   - stock_quantity
-   - category_id (FK → Categories.id)
-   - created_by (FK → Users.id)
-   - created_at, updated_at
+## ✅ Status
 
-ER Diagram
-   +-----------+        +-------------+        +-----------+
-   |   Users   |        |  Categories |        | Products  |
-   +-----------+        +-------------+        +-----------+
-   | id (PK)   |<----+  | id (PK)     |<----+  | id (PK)   |
-   | username  |     |  | name        |     |  | name      |
-   | email     |     |  | description |     |  | price     |
-   | password  |     |  | created_at  |     |  | stock_qty |
-   | is_vendor |     |  | updated_at  |     |  | category_id (FK) 
-   | created_at|     |                  |   |  | created_by (FK) 
-   +-----------+     |                  |   |  | created_at|
-                     |                  |   |  | updated_at|
-                     +------------------+   +--------------+
+This project is **production-ready** and can serve as a base for e-commerce platforms.
 
-# This schema allows:
-Users → can be customers or vendors.
-
-Categories → organize products.
-
-Products → linked to both categories and vendors (users who created them).
-
-👩‍💻 Author
+## Author
 Halimah Temitope
-Backend Engineer | ALX ProDev Backend Program

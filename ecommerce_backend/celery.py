@@ -7,7 +7,7 @@ app = Celery('ecommerce_backend')
 
 app.config_from_object('django.conf:settings', namespace='CELERY')
 # Broker: RabbitMQ
-app.conf.broker_url = os.environ.get("RABBITMQ_URL")
+app.conf.broker_url = os.environ.get("REDIS_URL")
 
 # Backend: Redis
 app.conf.result_backend = os.environ.get("REDIS_URL")

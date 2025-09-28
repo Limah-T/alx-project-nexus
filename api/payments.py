@@ -17,10 +17,8 @@ def getSubAccount(subaccount_id):
     try:
         response = requests.get(url=f"{SUBACCOUNT_URL}/{subaccount_id}", headers=headers)
         if response.status_code != 200:
-            print("error", response.json())
             return False
-    except Exception as e:
-        print(str(e))
+    except Exception:
         return False
     return response.json()
 
@@ -35,8 +33,7 @@ def getBankCode(bank_name):
             if b["name"] == bank_name:
                 code = b["code"]
                 break
-    except Exception as e:
-        print(str(e))
+    except Exception:
         return False
     return code
 
@@ -56,9 +53,7 @@ def createSubAccount(business_name, bank_code, account_no):
     try:
         response = requests.post(url=SUBACCOUNT_URL, headers=headers, json=payload)
         data = response.json()
-        print(data)
-    except Exception as e:
-        print(str(e))
+    except Exception:
         return False
     return data
 
@@ -83,10 +78,8 @@ def createTransactionSplit(name, subaccount_code):
     try:
         response = requests.post(url=TRANSACTION_SPLIT, headers=headers, json=payload)
         if response.status_code != 200:
-            print("Error", response.json())
             return False
-    except Exception as e:
-        print("From Exception", str(e))
+    except Exception:
         return False
     return response.json()
 
@@ -110,7 +103,6 @@ def initializeTransactionVendors(product_data):
     for transaction in all_vendors:
         amount = all_vendors[transaction]
         vendor = BankAccount.objects.get(subaccount_code=transaction)
-        print(getSubAccount(vendor.subaccount_code))
         payload = {
             "amount": amount * 100,
             "email": vendor.vendor.email,
@@ -120,12 +112,9 @@ def initializeTransactionVendors(product_data):
         try:
             response = requests.post(url=TRANSACTION_INITIALIZATION, headers=headers, json=payload)
             if response.status_code != 200:
-                print("Error from here", response.json())
                 return False
-        except Exception as e:
-            print("Exception", str(e))
+        except Exception:
             return False
-    print(response.json())
     return response.json()
 
 def initializeTransaction(product_data):
@@ -145,15 +134,10 @@ def initializeTransaction(product_data):
     try:
         response = requests.post(url=TRANSACTION_INITIALIZATION, headers=headers, json=payload)
         if response.status_code != 200:
-            print("Error from here", response.json())
             return False
     except Exception as e:
-        print("Exception", str(e))
         return False
-    print(response.json())
     return response.json()
-
-
 
 def paymentVerify(reference):
     headers = {
@@ -163,10 +147,8 @@ def paymentVerify(reference):
     try:
         response = requests.get(url=f"{PAYMENT_VERIFY}/{reference}", headers=headers)
         if response.status_code != 200:
-            print("error", response.json())
             return False
     except Exception as e:
-        print("Exception", str(e))
         return False
     return response.json()
 

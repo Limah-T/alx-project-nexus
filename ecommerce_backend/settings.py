@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'phonenumber_field', 
     'django_filters',
+    'drf_spectacular',
     
 ]
 
@@ -43,6 +44,7 @@ MIDDLEWARE = [
     'django_otp.middleware.OTPMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'api.utils.middleware.IPTrackingMiddleware',
 ]
 
 ROOT_URLCONF = 'ecommerce_backend.urls'
@@ -129,6 +131,7 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 with open("private_key.pem", "rb") as file:
@@ -167,8 +170,8 @@ MEDIA_URL = '/media/'
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 # Celery + Redis configuration
-CELERY_BROKER_URL = env('RABBITMQ_URL', default="amqp://my_user1:Qltp%230619@127.0.0.1:5672/myvhost1")
-CELERY_RESULT_BACKEND = f"{env('REDIS_URL')}/0"
+CELERY_BROKER_URL = f"{env('REDIS_URL')}/0"
+CELERY_RESULT_BACKEND = f"{env('REDIS_URL')}/1"
 CELERY_TASK_ALWAYS_EAGER = False
 CELERY_TASK_TIME_LIMIT = int(env('CELERY_TASK_TIME_LIMIT'))
 CELERY_TASK_SOFT_TIME_LIMIT = int(env('CELERY_TASK_SOFT_TIME_LIMIT'))
@@ -184,3 +187,100 @@ CACHES = {
         "TIMEOUT": None,   # cache forever by default
     }
 }
+
+# drf-spectacular settings
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Nest API",
+    "DESCRIPTION": "API documentation",
+    "VERSION": "1.0.0",
+
+    "SERVERS": [{"url": "/"}],
+
+    "SECURITY": [
+        {"BearerAuth": []},   # reference the scheme name below
+    ],
+
+    "SECURITY_SCHEMES": {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "JWT authentication. Enter only the access token here (without 'Bearer'), Swagger will add the prefix automatically.",
+        },
+    },
+}
+
+# Logging configuration
+
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+if not os.path.exists(LOG_DIR):
+    os.makedirs(LOG_DIR)
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,  # keep Django’s default loggers
+
+    "formatters": {
+        "verbose": {
+            "format": "[{levelname}] {asctime} {module}.{funcName}:{lineno} - {message}",
+            "style": "{",
+        },
+        "simple": {
+            "format": "[{levelname}] {message}",
+            "style": "{",
+        },
+    },
+
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+        "file": {
+            "class": "logging.FileHandler",
+            "filename": "django_debug.log",   # log file in project root
+            "formatter": "verbose",
+        },
+    },
+
+    "root": {  # root logger
+        "handlers": ["console", "file"],
+        "level": "INFO",
+    },
+
+    "loggers": {
+        "django": {
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "listings": {  
+            "handlers": ["console", "file"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+    },
+}
+
+# Security Header settings for production
+if not DEBUG:
+    # Force HTTPS everywhere
+    SECURE_SSL_REDIRECT = True  
+
+    # Tell browsers "only use HTTPS for this site"
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+    # Basic browser protections
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = "DENY"
+
+    # Content Security Policy (limits where resources can load from)
+    CSP_DEFAULT_SRC = ("'self'",)
+    CSP_STYLE_SRC = ("'self'", "'unsafe-inline'",)
+    CSP_SCRIPT_SRC = ("'self'", "'unsafe-inline'", "'unsafe-eval'",)
+    CSP_IMG_SRC = ("'self'", "data:", "https:")
+    CSP_FONT_SRC = ("'self'", "https:", "data:")
+    CSP_CONNECT_SRC = ("'self'", "https:")

@@ -1,13 +1,18 @@
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.decorators import api_view, authentication_classes, permission_classes, renderer_classes
+from rest_framework.decorators import (
+                                        api_view, authentication_classes, 
+                                        permission_classes, renderer_classes
+                                    )
 from rest_framework.renderers import TemplateHTMLRenderer, JSONRenderer
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from django.contrib.auth.hashers import check_password
 from django.db import transaction
+
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
+
 
 from .auth_serializers import ( 
                                 CustomerRegSerializer, VendorRegSerializer, 
@@ -19,16 +24,14 @@ from .utils.token import (
                             black_list_user_tokens, 
                             valid_access_token
                         )
-from .utils.helper_functions import check_email_id_exist_in_token, set_user_password_reset_time
+from .utils.helper_functions import (
+                            check_email_id_exist_in_token, 
+                            set_user_password_reset_time,
+                            retrieve_user_profile
+                        )
 from .models import CustomUser, BlaskListAccessToken
 from api.tasks import send_email
 import os
-
-class CustomTokenRefreshView(TokenRefreshView):
-
-    def post(self, request, *args, **kwargs):
-        black_list_user_tokens(user=request.user)
-        return super().post(request, *args, **kwargs)
 
 class CustomerRegView(APIView):
     http_method_names = ["post"]
@@ -50,9 +53,8 @@ class CustomerRegView(APIView):
             html_template="api/signup_verification.html",
             context={"verification_link": verification_link},
             email=user.email
-        )
-        )
-        
+            )
+        )       
         return Response({'message': 'please check your email for verification'}, 
                         status=200)
 
@@ -80,7 +82,16 @@ class VendorRegView(APIView):
     
         return Response({'message': 'please check your email for verification'}, 
                         status=200)
-    
+
+@extend_schema(methods=["GET"], request=None,
+    parameters=[
+        OpenApiParameter("token", str, OpenApiParameter.QUERY, True, description="Email verification token")
+    ],
+    responses={
+        200: OpenApiResponse(description="Account created successfully"),
+        400: OpenApiResponse(description="Invalid or expired token / bad credentials"),
+    }
+)    
 @api_view(http_method_names=["GET"])
 @authentication_classes([])
 @permission_classes([])
@@ -146,6 +157,15 @@ class ResetPasswordView(APIView):
                         status=200
         )
 
+@extend_schema(methods=["GET"], request=None,
+    parameters=[
+        OpenApiParameter("token", str, OpenApiParameter.QUERY, True, description="Password reset token")
+    ],
+    responses={
+        200: OpenApiResponse(description="Password has been reset successfully."),
+        400: OpenApiResponse(description="Invalid or expired token / bad credentials"),
+    }
+)
 @api_view(http_method_names=["GET"])
 @authentication_classes([])
 @permission_classes([])
@@ -233,6 +253,7 @@ class LogoutView(APIView):
     
     
 """****************************Profile Section******************************************"""
+
 class CustomerProfileView(ModelViewSet):
     serializer_class = CustomerProfileSerializer
     
@@ -242,7 +263,8 @@ class CustomerProfileView(ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         if not valid_access_token(request):
             return Response({"error": "Inavid token."}, status=400)
-        serializer = self.serializer_class(request.user)
+        user = retrieve_user_profile(request.user)
+        serializer = self.serializer_class(user)
         return Response(serializer.data, status=200)
     
     def update(self, request, *args, **kwargs):
@@ -290,7 +312,8 @@ class VendorProfileView(ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         if not valid_access_token(request):
             return Response({"error": "Inavid token."}, status=400)
-        serializer = self.serializer_class(request.user)
+        user = retrieve_user_profile(request.user)
+        serializer = self.serializer_class(user)
         return Response(serializer.data, status=200)
     
     def update(self, request, *args, **kwargs):
@@ -330,6 +353,15 @@ class VendorProfileView(ModelViewSet):
                         status=200
         )
 
+@extend_schema(methods=["GET"], request=None,
+    parameters=[
+        OpenApiParameter("token", str, OpenApiParameter.QUERY, True, description="Email Update token")
+    ],
+    responses={
+        200: OpenApiResponse(description="Email verified successfully."),
+        400: OpenApiResponse(description="Invalid or expired token / bad credentials"),
+    }
+)
 @api_view(http_method_names=["GET"])
 @authentication_classes([])
 @permission_classes([])
@@ -363,6 +395,15 @@ def verifyEmailUpdate(request):
     return Response({"success": "Email updated successfully."},
                     template_name="api/email_verified.html", status=200)
 
+@extend_schema(methods=["GET"], request=None,
+    parameters=[
+        OpenApiParameter("token", str, OpenApiParameter.QUERY, True, description="Deactivation token")
+    ],
+    responses={
+        200: OpenApiResponse(description="Account deactivated successfully"),
+        400: OpenApiResponse(description="Invalid or expired token / bad credentials"),
+    }
+)
 @api_view(http_method_names=["GET"])
 @authentication_classes([])
 @permission_classes([])
@@ -388,4 +429,4 @@ def verifyAcctDeactivation(request):
     user.save(update_fields=["is_active"])
     return Response({"success": "Account has been deactivated successfully"}, status=200, template_name="api/deactivate_acct_verified.html")
 
-print(CustomUser.objects.values().count())
+# python manage.py migrate && gunicorn alx_travel_app.wsgi:application --bind 0.0.0.0:$PORT

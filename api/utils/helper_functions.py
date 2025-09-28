@@ -1,8 +1,13 @@
-from ..models import CustomUser, CartItem, Cart, Product, BankAccount, TransactionSplit
-from .calculation import vendor_payout_sale, vendor_payout
-from datetime import timedelta
 from django.utils import timezone
 from collections import defaultdict
+from django.core.cache import cache
+
+from datetime import timedelta
+from ..models import (
+                        CustomUser, CartItem, Cart, Product, 
+                        BankAccount, TransactionSplit
+                    )
+from .calculation import vendor_payout_sale, vendor_payout
 from .calculation import update_product_in_cart
 import os
 
@@ -147,8 +152,7 @@ def check_list_of_products_quantity(cart, product_data):
                     item.total_amount = item.cal_total_amount
                     item.save(update_fields=["total_amount"])
                     total_amount += item.total_amount
-        except Exception as e:
-            print(str(e))
+        except Exception:
             return False
     return total_amount
 
@@ -164,8 +168,7 @@ def check_product_quantity(cart, product_data):
             item.total_amount = item.cal_total_amount
             item.save(update_fields=["total_amount"])
             amount += item.total_amount
-    except Exception as e:
-        print(str(e))
+    except Exception:
         return False
     return amount
     
@@ -174,7 +177,6 @@ def vendors_details(product_data):
     merged_data = merge_duplicate_products_id(product_data)
     for product in merged_data:
         quantity = merged_data[product]
-        print(quantity)
         vendor_product = Product.objects.get(id=str(product))
         vendor = BankAccount.objects.get(vendor=vendor_product.vendor)
         if vendor_product.discount_percent != 0:
@@ -194,8 +196,6 @@ def vendor_details(product_data):
     vendor_data = {}
     vendor_product = Product.objects.get(id=str(product))
     vendor = BankAccount.objects.get(vendor=vendor_product.vendor)
-    print(vendor)
-    print(vendor.subaccount_code)
     if vendor_product.discount_percent != 0:
         discount_amount = vendor_payout_sale(original_price=float(vendor_product.   original_price), discount_percent=vendor_product.discount_percent
                                             )
@@ -219,5 +219,18 @@ def deduct_product_quantity_after_payment(cart):
         return False
     return quantity
 
+def retrieve_user_profile(user):
+    user_profile = cache.get(f"user_profile__{user.id}")
+    if user_profile is None:
+        cache.set(f"user_profile_{user.id}", user.id)
+        user_profile = user.id
+    return user_profile
 
-
+# Get the Client Ip address
+def get_client_ip(request):
+    address = request.META.get('HTTP_X_FORWARDED_FOR')
+    if address:
+        ip_address = address.split(",")[0].strip()
+    else:
+        ip_address = request.META['REMOTE_ADDR']
+    return ip_address

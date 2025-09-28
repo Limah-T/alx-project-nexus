@@ -62,8 +62,8 @@ urlpatterns = [
                                     ),
 
     # Bank Account Number
-    path('account_number/', BankAccountView.as_view({'post': 'create'}), name='account_number'),
-    path('confirm/bank_details', confirmBankNameView, name="confirm_bank_details"),
+    path('vendor/account_number/', BankAccountView.as_view({'post': 'create'}), name='account_number'),
+    path('vendor/confirm/bank_details', confirmBankNameView, name="confirm_bank_details"),
 
     # Payment Transactions
     path('payment/', PaymentView.as_view(), name="payment"),
