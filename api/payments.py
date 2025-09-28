@@ -93,7 +93,7 @@ def transactionSplit(name, vendor, subaccount_code):
     )
     return True
 
-def initializeTransactionVendors(product_data):
+def initializeTransactionVendors(product_data, many):
     headers = {
         "Authorization": f"Bearer {PAYMENT_SECRET_KEY}",
         "Content-Type": "application/json"
