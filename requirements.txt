@@ -47,6 +47,3 @@ whitenoise==6.9.0
 django-environ==0.12.0
 requests==2.32.3
 
-# Payments (Paystack / Stripe integration)
-paystackapi==2.1.0   # (unofficial SDK, or use raw requests to Paystack API)
-stripe==10.4.0       # (if you want Stripe Connect)

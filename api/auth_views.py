@@ -1,25 +1,37 @@
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.decorators import api_view, authentication_classes, permission_classes, renderer_classes
+from rest_framework.decorators import (
+                                        api_view, authentication_classes, 
+                                        permission_classes, renderer_classes
+                                    )
 from rest_framework.renderers import TemplateHTMLRenderer, JSONRenderer
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework_simplejwt.views import TokenRefreshView
 from django.contrib.auth.hashers import check_password
+from django.db import transaction
 
-from .auth_serializers import CustomerRegSerializer, VendorRegSerializer, LoginSerializer, ResetPasswordSerializer, SetPasswordSerializer, ChangePasswordSerializer, CustomerProfileSerializer
-from .utils.token import encode_token, decode_token, black_list_user_tokens, valid_access_token
-from .utils.helper_functions import check_email_id_exist_in_token, set_user_password_reset_time
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiResponse
+
+
+from .auth_serializers import ( 
+                                CustomerRegSerializer, VendorRegSerializer, 
+                                LoginSerializer, ResetPasswordSerializer,
+                                SetPasswordSerializer, ChangePasswordSerializer, CustomerProfileSerializer
+                            )
+from .utils.token import (
+                            encode_token, decode_token, 
+                            black_list_user_tokens, 
+                            valid_access_token
+                        )
+from .utils.helper_functions import (
+                            check_email_id_exist_in_token, 
+                            set_user_password_reset_time,
+                            retrieve_user_profile
+                        )
 from .models import CustomUser, BlaskListAccessToken
-from .tasks import send_email
+from api.tasks import send_email
 import os
-
-class CustomTokenRefreshView(TokenRefreshView):
-
-    def post(self, request, *args, **kwargs):
-        black_list_user_tokens(user=request.user)
-        return super().post(request, *args, **kwargs)
 
 class CustomerRegView(APIView):
     http_method_names = ["post"]
@@ -32,14 +44,17 @@ class CustomerRegView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         token = encode_token(user.id, user.email)
-        verification_link = f"{os.environ.get("APP_DOMAIN")}/verify_email/register?token={token}"
-        send_email(
+        verification_link = f"{os.environ.get('APP_DOMAIN')}/verify_email/register?token={token}"
+         # Task will only be queued if the transaction commits successfully
+        transaction.on_commit(
+            lambda: send_email.delay(
             subject="Verify your email",
             txt_template="api/text_mails/signup_verification.txt",
             html_template="api/signup_verification.html",
             context={"verification_link": verification_link},
             email=user.email
-        )
+            )
+        )       
         return Response({'message': 'please check your email for verification'}, 
                         status=200)
 
@@ -54,17 +69,29 @@ class VendorRegView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         token = encode_token(user.id, user.email)
-        verification_link = f"{os.environ.get("APP_DOMAIN")}/verify_email/register?{token}"
-        send_email(
-            subject="Verify your email",
-            txt_template="api/text_mails/signup_verification.txt",
-            html_template="api/signup_verification.html",
-            context={"verification_link": verification_link},
-            email=user.email
+        verification_link = f"{os.environ.get('APP_DOMAIN')}/verify_email/register?token={token}"
+        transaction.on_commit(
+            lambda: send_email.delay(
+                    subject="Verify your email",
+                    txt_template="api/text_mails/signup_verification.txt",
+                    html_template="api/signup_verification.html",
+                    context={"verification_link": verification_link},
+                    email=user.email
+            )
         )
+    
         return Response({'message': 'please check your email for verification'}, 
                         status=200)
 
+@extend_schema(methods=["GET"], request=None,
+    parameters=[
+        OpenApiParameter("token", str, OpenApiParameter.QUERY, True, description="Email verification token")
+    ],
+    responses={
+        200: OpenApiResponse(description="Account created successfully"),
+        400: OpenApiResponse(description="Invalid or expired token / bad credentials"),
+    }
+)    
 @api_view(http_method_names=["GET"])
 @authentication_classes([])
 @permission_classes([])
@@ -119,8 +146,8 @@ class ResetPasswordView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["email"]
         token = encode_token(user.id, user.email)
-        verification_link = f"{os.environ.get("APP_DOMAIN")}/verify/password_reset?token={token}"
-        send_email(
+        verification_link = f"{os.environ.get('APP_DOMAIN')}/verify/password_reset?token={token}"
+        send_email.delay(
             subject="Verify your email",
             txt_template="api/text_mails/reset_password.txt",
             html_template="api/reset_password.html",
@@ -130,6 +157,15 @@ class ResetPasswordView(APIView):
                         status=200
         )
 
+@extend_schema(methods=["GET"], request=None,
+    parameters=[
+        OpenApiParameter("token", str, OpenApiParameter.QUERY, True, description="Password reset token")
+    ],
+    responses={
+        200: OpenApiResponse(description="Password has been reset successfully."),
+        400: OpenApiResponse(description="Invalid or expired token / bad credentials"),
+    }
+)
 @api_view(http_method_names=["GET"])
 @authentication_classes([])
 @permission_classes([])
@@ -217,6 +253,7 @@ class LogoutView(APIView):
     
     
 """****************************Profile Section******************************************"""
+
 class CustomerProfileView(ModelViewSet):
     serializer_class = CustomerProfileSerializer
     
@@ -226,7 +263,8 @@ class CustomerProfileView(ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         if not valid_access_token(request):
             return Response({"error": "Inavid token."}, status=400)
-        serializer = self.serializer_class(request.user)
+        user = retrieve_user_profile(request.user)
+        serializer = self.serializer_class(user)
         return Response(serializer.data, status=200)
     
     def update(self, request, *args, **kwargs):
@@ -238,9 +276,9 @@ class CustomerProfileView(ModelViewSet):
         user = serializer.save()
         if user.pending_email:
             token = encode_token(user.id, user.pending_email)
-            verification_link = f"{os.environ.get("APP_DOMAIN")}/verify/email_update?token={token}"
+            verification_link = f"{os.environ.get('APP_DOMAIN')}/verify/email_update?token={token}"
             token = encode_token(user.id, user.pending_email)
-            send_email(
+            send_email.delay(
                     subject="Update your email", txt_template="api/text_mails/update_email.txt",
                     html_template="api/update_email.html", 
                     context={"verification_link": verification_link, "name": user.first_name},
@@ -254,8 +292,8 @@ class CustomerProfileView(ModelViewSet):
             return Response({"error": "Inavid token."}, status=400)
         user = request.user
         token = encode_token(user.id, user.email)
-        verification_link = f"{os.environ.get("APP_DOMAIN")}/verify/acct_deactivation?token={token}"   
-        send_email(
+        verification_link = f"{os.environ.get('APP_DOMAIN')}/verify/acct_deactivation?token={token}"   
+        send_email.delay(
                 subject="Deactivate your account?", txt_template="api/text_mails/deactivate_acct_alert.txt",
                 html_template="api/deactivate_acct_alert.html", 
                 context={"verification_link": verification_link, "name": user.first_name},
@@ -274,7 +312,8 @@ class VendorProfileView(ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         if not valid_access_token(request):
             return Response({"error": "Inavid token."}, status=400)
-        serializer = self.serializer_class(request.user)
+        user = retrieve_user_profile(request.user)
+        serializer = self.serializer_class(user)
         return Response(serializer.data, status=200)
     
     def update(self, request, *args, **kwargs):
@@ -286,9 +325,9 @@ class VendorProfileView(ModelViewSet):
         user = serializer.save()
         if user.pending_email:
             token = encode_token(user.id, user.email)
-            verification_link = f"{os.environ.get("APP_DOMAIN")}/verify_email_update?token={token}"
+            verification_link = f"{os.environ.get('APP_DOMAIN')}/verify_email_update?token={token}"
             token = encode_token(user.id, user.pending_email)
-            send_email(
+            send_email.delay(
                     subject="Update your email", txt_template="api/text_mails/update_email.txt",
                     html_template="api/update_email.html", 
                     context={"verification_link": verification_link, "name": user.first_name},
@@ -304,8 +343,8 @@ class VendorProfileView(ModelViewSet):
             return Response({"error": "Inavid token."}, status=400)
         user = request.user
         token = encode_token(user.id, user.email)
-        verification_link = f"{os.environ.get("APP_DOMAIN")}/verify/acct_deactivation?token={token}"   
-        send_email(
+        verification_link = f"{os.environ.get('APP_DOMAIN')}/verify/acct_deactivation?token={token}"   
+        send_email.delay(
                 subject="Deactivate your account?", txt_template="api/text_mails/deactivate_acct_alert.txt", html_template="api/deactivate_acct_alert.html", 
                 context={"verification_link": verification_link, "name": user.first_name},
                 email=user.email
@@ -314,6 +353,15 @@ class VendorProfileView(ModelViewSet):
                         status=200
         )
 
+@extend_schema(methods=["GET"], request=None,
+    parameters=[
+        OpenApiParameter("token", str, OpenApiParameter.QUERY, True, description="Email Update token")
+    ],
+    responses={
+        200: OpenApiResponse(description="Email verified successfully."),
+        400: OpenApiResponse(description="Invalid or expired token / bad credentials"),
+    }
+)
 @api_view(http_method_names=["GET"])
 @authentication_classes([])
 @permission_classes([])
@@ -347,6 +395,15 @@ def verifyEmailUpdate(request):
     return Response({"success": "Email updated successfully."},
                     template_name="api/email_verified.html", status=200)
 
+@extend_schema(methods=["GET"], request=None,
+    parameters=[
+        OpenApiParameter("token", str, OpenApiParameter.QUERY, True, description="Deactivation token")
+    ],
+    responses={
+        200: OpenApiResponse(description="Account deactivated successfully"),
+        400: OpenApiResponse(description="Invalid or expired token / bad credentials"),
+    }
+)
 @api_view(http_method_names=["GET"])
 @authentication_classes([])
 @permission_classes([])
@@ -371,3 +428,5 @@ def verifyAcctDeactivation(request):
     user.is_active = False
     user.save(update_fields=["is_active"])
     return Response({"success": "Account has been deactivated successfully"}, status=200, template_name="api/deactivate_acct_verified.html")
+
+# python manage.py migrate && gunicorn alx_travel_app.wsgi:application --bind 0.0.0.0:$PORT

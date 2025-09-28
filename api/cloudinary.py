@@ -8,16 +8,14 @@ def uploadImage(image):
             overwrite=True,
             resource_type="image"
         )
-    except Exception as e:
-        print(str(e))
-        return str(e)
+    except Exception:
+        return False
     return upload_result
 
 def getImage(public_id):
     try:
         response = cloudinary.api.resource(public_id)
-    except Exception as e:
-        print(str(e))
+    except Exception:
         return False
     return response
 

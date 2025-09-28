@@ -15,11 +15,14 @@ def customer_payout_sale(original_price, discount_percent):
 
 def platform_payout(original_price):
     platform_percentage = int(os.environ.get("PLATFORM_PERCENTAGE")) / 100  # e.g 10/100
-    discount = float(original_price) * platform_percentage # 50,000 * 0.1
+    discount = original_price * platform_percentage # 50,000 * 0.1
     return discount # 5,000
 
 def vendor_payout_sale(original_price, discount_percent):
-    vendor_discount = discount_from_vendor(original_price, discount_percent)
+    if discount_percent != 0:
+        vendor_discount = discount_from_vendor(original_price, discount_percent)
+    else:
+        vendor_discount = 0
     vendor_price = original_price - vendor_discount # 50,000 - 2,000
     amount = vendor_price - platform_payout(original_price) # 47,500 - 5,000
     return amount #42,500
@@ -33,17 +36,18 @@ def vendor_payout(original_price):
 def check_product_quantity(item_quantity, product):
     try:
         with transaction.atomic():
-            print("Stock:", product.stock, "item_quantity:", item_quantity)
             if product.stock >= item_quantity:
-                print("Can purchase")
                 return True
-    except IntegrityError as e:
-        print(str(e), "from transaction.atomic")
+    except IntegrityError:
         return False
 
 def total_amount_of_cartItems(validated_data, user):
     total_amount, merged = 0, defaultdict(int)
-    cart, created = Cart.objects.get_or_create(customer=user)
+    try:        
+        if not Cart.objects.filter(customer=user, status="unpaid").exists():
+            cart = Cart.objects.create(customer=user, status="unpaid")
+    except Exception:
+        cart, created = Cart.objects.get_or_create(customer=user)
     for data in validated_data:  
         merged[data["product"]] +=  int(data["item_quantity"])   
     merged_copy = merged.copy()
@@ -67,7 +71,7 @@ def total_amount_of_cartItems(validated_data, user):
     return total_amount
 
 def amount_of_cartItem(validated_data, user):
-    cart, created = Cart.objects.get_or_create(customer=user)
+    cart, created = Cart.objects.get_or_create(customer=user, status="unpaid")
     total_amount = 0
     product_id = validated_data["product"]
     item_quantity = validated_data["item_quantity"]
@@ -104,7 +108,6 @@ def update_product_in_cart(product_id, total_quantity, cart):
     )
     cart_item.save(update_fields=["item_quantity", "total_amount"])
     total_amount += item_amount
-    print(total_amount)
     return cart_item
 
 def checkOut(check_out, user):

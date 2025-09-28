@@ -1,5 +1,5 @@
 from .models import TransactionSplit, BankAccount
-from .utils.helper_functions import vendors_details
+from .utils.helper_functions import vendors_details, vendor_details
 import requests, os
 
 PAYMENT_SECRET_KEY = os.environ.get("PAYMENT_SECRET_KEY")
@@ -17,10 +17,8 @@ def getSubAccount(subaccount_id):
     try:
         response = requests.get(url=f"{SUBACCOUNT_URL}/{subaccount_id}", headers=headers)
         if response.status_code != 200:
-            print("error", response.json())
             return False
-    except Exception as e:
-        print(str(e))
+    except Exception:
         return False
     return response.json()
 
@@ -35,8 +33,7 @@ def getBankCode(bank_name):
             if b["name"] == bank_name:
                 code = b["code"]
                 break
-    except Exception as e:
-        print(str(e))
+    except Exception:
         return False
     return code
 
@@ -56,9 +53,7 @@ def createSubAccount(business_name, bank_code, account_no):
     try:
         response = requests.post(url=SUBACCOUNT_URL, headers=headers, json=payload)
         data = response.json()
-        print(data)
-    except Exception as e:
-        print(str(e))
+    except Exception:
         return False
     return data
 
@@ -83,10 +78,8 @@ def createTransactionSplit(name, subaccount_code):
     try:
         response = requests.post(url=TRANSACTION_SPLIT, headers=headers, json=payload)
         if response.status_code != 200:
-            print("Error", response.json())
             return False
-    except Exception as e:
-        print("From Exception", str(e))
+    except Exception:
         return False
     return response.json()
 
@@ -100,7 +93,7 @@ def transactionSplit(name, vendor, subaccount_code):
     )
     return True
 
-def initializeTransaction(many, product_data):
+def initializeTransactionVendors(product_data):
     headers = {
         "Authorization": f"Bearer {PAYMENT_SECRET_KEY}",
         "Content-Type": "application/json"
@@ -108,10 +101,8 @@ def initializeTransaction(many, product_data):
 
     all_vendors = vendors_details(product_data)
     for transaction in all_vendors:
-        print(transaction)
         amount = all_vendors[transaction]
         vendor = BankAccount.objects.get(subaccount_code=transaction)
-        print(getSubAccount(vendor.subaccount_code))
         payload = {
             "amount": amount * 100,
             "email": vendor.vendor.email,
@@ -121,14 +112,32 @@ def initializeTransaction(many, product_data):
         try:
             response = requests.post(url=TRANSACTION_INITIALIZATION, headers=headers, json=payload)
             if response.status_code != 200:
-                print("Error from here", response.json())
                 return False
-        except Exception as e:
-            print("Exception", str(e))
+        except Exception:
             return False
-    print(response.json())
     return response.json()
 
+def initializeTransaction(product_data):
+    headers = {
+        "Authorization": f"Bearer {PAYMENT_SECRET_KEY}",
+        "Content-Type": "application/json"
+    }
+    vendor = vendor_details(product_data)
+    vendor_bank_data = BankAccount.objects.get(subaccount_code=vendor["subaccount"])
+
+    payload = {
+            "amount": vendor["amount"] * 100,
+            "email": vendor_bank_data.vendor.email,
+            "subaccount": str(vendor["subaccount"])
+        }
+
+    try:
+        response = requests.post(url=TRANSACTION_INITIALIZATION, headers=headers, json=payload)
+        if response.status_code != 200:
+            return False
+    except Exception as e:
+        return False
+    return response.json()
 
 def paymentVerify(reference):
     headers = {
@@ -138,10 +147,8 @@ def paymentVerify(reference):
     try:
         response = requests.get(url=f"{PAYMENT_VERIFY}/{reference}", headers=headers)
         if response.status_code != 200:
-            print("error", response.json())
             return False
     except Exception as e:
-        print("Exception", str(e))
         return False
     return response.json()
 

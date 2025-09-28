@@ -7,26 +7,33 @@ from rest_framework.decorators import api_view
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.shortcuts import get_object_or_404
+from django.db import transaction
 
-from .serializers import (CategorySerializer, ColorSerializer, 
-                          ProductSerializer, BankAccountSerializer, 
-                          ModifyProductSerializer, CartItemSerializer
-                          )
-from .models import (Category, Color, Product, BankAccount, 
-                     CartItem, Payment, Cart, Order
+from .serializers import (
+                            CategorySerializer, ColorSerializer, 
+                            ProductSerializer, BankAccountSerializer, 
+                            ModifyProductSerializer, CartItemSerializer
+                        )
+from .models import (
+                        Category, Color, Product, BankAccount, 
+                        CartItem, Payment, Cart, Order
                     )
 from .custom_classes import CustomPageNumberPagination
-from .utils.helper_functions import (check_if_admin, 
-                                     request_instance,check_if_list_of_products_exist, check_if_user_cart_is_active, check_if_products_exist_in_cart, update_list_of_cartItems, check_if_product_exist, retrive_cartItems, retrieve_single_cartItem, remove_products_from_cart, remove_a_product_from_cart, check_list_of_products_quantity, vendors_details
-                                    )
+from .utils.helper_functions import (
+                                    check_if_admin, 
+                                    request_instance,check_if_list_of_products_exist, check_if_user_cart_is_active, check_if_products_exist_in_cart, update_list_of_cartItems, check_if_product_exist, retrive_cartItems, retrieve_single_cartItem, remove_products_from_cart, remove_a_product_from_cart, check_list_of_products_quantity, deduct_product_quantity_after_payment, check_product_quantity
+                                )
 from .utils.token import valid_access_token
 from .cloudinary import uploadImage, getImage
-from .utils.calculation import (total_amount_of_cartItems, 
-                                amount_of_cartItem, 
-                                update_product_in_cart, 
-                                checkOut
+from .utils.calculation import (
+                                    total_amount_of_cartItems, 
+                                    amount_of_cartItem, 
+                                    update_product_in_cart, 
+                                    checkOut
                             )
-from .payments import transactionSplit, initializeTransaction, paymentVerify
+from .payments import (transactionSplit, initializeTransaction, 
+                       paymentVerify, initializeTransactionVendors
+                    )
 
 class CategoryView(ModelViewSet):
     serializer_class = CategorySerializer
@@ -338,7 +345,7 @@ class CartItemView(ModelViewSet):
         if not valid_access_token(request.auth):
             return Response({"error": "Invalid Token."}, status=400)
         
-        many = request_instance(request)
+        many = request_instance(request.data)
         serializer = self.serializer_class(data=request.data, many=many)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -474,13 +481,23 @@ class PaymentView(APIView):
                 return Response({"error": "Some or all of the provided product IDs do not exist."},status=400)
             if not check_list_of_products_quantity(cart, request.data):
                 return Response({"error": "Few or some of the products quantity is higher than the stock quantity"})
-            payment_transaction = initializeTransaction(product_data=request.data, many=many)
+            payment_transaction = initializeTransactionVendors(product_data=request.data, many=many)
             if not payment_transaction:
                 return Response({"error": "error"}, status=400)
+        else:
+            product = check_if_product_exist(request.data)
+            if not product:
+                return Response({"error": "Provided product ID do not exist."}, status=400)
+            if not check_product_quantity(cart, request.data):
+                return Response({"error": "Product quantity is higher than stock quantity"}, status=400)
+            payment_transaction = initializeTransaction(product_data=request.data)
             reference = payment_transaction["data"]["reference"]
-            print(reference)
-            payment = Payment.objects.create(cart=check_if_products_exist_in_cart(cart), reference=reference)            
-        return Response({"success": payment.id}, status=200)
+            payment, created = Payment.objects.get_or_create(
+                                    cart=check_if_products_exist_in_cart(cart), 
+                                    defaults={"reference": reference}
+                                    )    
+        return Response({"url": payment_transaction["data"]["authorization_url"],
+                         "payment_id": payment.id}, status=200)
 
 class VerifyPaymentReference(APIView):
     http_method_names = ["post"]
@@ -504,6 +521,9 @@ class VerifyPaymentReference(APIView):
         payment.amount = amount / 100
         payment.status = "verified"
         payment.save()
+        item_quantity_deduction = deduct_product_quantity_after_payment(cart)
+        if not item_quantity_deduction:
+            return Response({"error": "While trying to deduct product quantity."}, status=400)
         order = Order.objects.create(payment=payment, payment_status = payment.status) 
         return Response({"success": order.id}, status=200)
     
@@ -514,5 +534,3 @@ class CustomerDashboard(APIView):
         if not valid_access_token(request.auth):
             return Response({"error": "Invalid Token."}, status=400)    
             
-
-    

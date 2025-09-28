@@ -1,8 +1,13 @@
-from ..models import CustomUser, CartItem, Cart, Product, BankAccount, TransactionSplit
-from .calculation import vendor_payout_sale, vendor_payout
-from datetime import timedelta
 from django.utils import timezone
 from collections import defaultdict
+from django.core.cache import cache
+
+from datetime import timedelta
+from ..models import (
+                        CustomUser, CartItem, Cart, Product, 
+                        BankAccount, TransactionSplit
+                    )
+from .calculation import vendor_payout_sale, vendor_payout
 from .calculation import update_product_in_cart
 import os
 
@@ -147,10 +152,25 @@ def check_list_of_products_quantity(cart, product_data):
                     item.total_amount = item.cal_total_amount
                     item.save(update_fields=["total_amount"])
                     total_amount += item.total_amount
-        except Exception as e:
-            print(str(e))
+        except Exception:
             return False
     return total_amount
+
+def check_product_quantity(cart, product_data):
+    product_id = product_data["product"]
+    quantity = product_data["item_quantity"]
+    amount = 0
+    try:
+        item = CartItem.objects.get(cart=cart, product=str(product_id))       
+        if item.product.stock >= quantity:
+            item.item_quantity = quantity
+            item.save(update_fields=["item_quantity"])
+            item.total_amount = item.cal_total_amount
+            item.save(update_fields=["total_amount"])
+            amount += item.total_amount
+    except Exception:
+        return False
+    return amount
     
 def vendors_details(product_data):
     vendors_merged_data = defaultdict(int)
@@ -159,20 +179,58 @@ def vendors_details(product_data):
         quantity = merged_data[product]
         vendor_product = Product.objects.get(id=str(product))
         vendor = BankAccount.objects.get(vendor=vendor_product.vendor)
-        print(vendor)
-        print(vendor.subaccount_code)
         if vendor_product.discount_percent != 0:
-            discount_amount = vendor_payout_sale(original_price=vendor_product.original_price,
-                                               discount_percent=vendor_product.discount_percent
+            discount_amount = vendor_payout_sale(original_price=float(vendor_product.   original_price), discount_percent=vendor_product.discount_percent
                                                )
             vendor_amount = discount_amount * quantity
         else:
-            vendor_amount = vendor_payout(float(vendor_product.original_price))
+            vendor_amount = float(vendor_product.original_price) * quantity
 
         vendors_merged_data[vendor.subaccount_code] += vendor_amount
     all_vendors = vendors_merged_data.copy()  
-    print(all_vendors)  
     return all_vendors
 
+def vendor_details(product_data):
+    product = product_data["product"]
+    quantity = product_data["item_quantity"]
+    vendor_data = {}
+    vendor_product = Product.objects.get(id=str(product))
+    vendor = BankAccount.objects.get(vendor=vendor_product.vendor)
+    if vendor_product.discount_percent != 0:
+        discount_amount = vendor_payout_sale(original_price=float(vendor_product.   original_price), discount_percent=vendor_product.discount_percent
+                                            )
+        vendor_amount = discount_amount * quantity
+    else:
+        vendor_amount = float(vendor_product.original_price) * quantity
+    vendor_data.update({"subaccount": vendor.subaccount_code, 
+                       "amount": vendor_amount,
+                       "email": vendor.vendor.email
+                       })
+    return vendor_data
 
+def deduct_product_quantity_after_payment(cart):
+    products = CartItem.objects.filter(cart=cart)
+    try:
+        for product in products:
+            quantity = Product.objects.get(id=product.product.id)
+            quantity.stock -= product.item_quantity
+            quantity.save(update_fields=["stock"])
+    except Exception:
+        return False
+    return quantity
 
+def retrieve_user_profile(user):
+    user_profile = cache.get(f"user_profile__{user.id}")
+    if user_profile is None:
+        cache.set(f"user_profile_{user.id}", user.id)
+        user_profile = user.id
+    return user_profile
+
+# Get the Client Ip address
+def get_client_ip(request):
+    address = request.META.get('HTTP_X_FORWARDED_FOR')
+    if address:
+        ip_address = address.split(",")[0].strip()
+    else:
+        ip_address = request.META['REMOTE_ADDR']
+    return ip_address
