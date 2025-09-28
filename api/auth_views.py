@@ -429,4 +429,3 @@ def verifyAcctDeactivation(request):
     user.save(update_fields=["is_active"])
     return Response({"success": "Account has been deactivated successfully"}, status=200, template_name="api/deactivate_acct_verified.html")
 
-# python manage.py migrate && gunicorn alx_travel_app.wsgi:application --bind 0.0.0.0:$PORT
