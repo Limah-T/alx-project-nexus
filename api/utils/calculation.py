@@ -43,9 +43,9 @@ def check_product_quantity(item_quantity, product):
 
 def total_amount_of_cartItems(validated_data, user):
     total_amount, merged = 0, defaultdict(int)
-    cart = Cart.objects.filter(customer=user, status="unpaid").exists()
+    cart = Cart.objects.filter(customer=user, status="unpaid")
     try:        
-        if not cart:
+        if cart != []:
             cart = Cart.objects.create(customer=user, status="unpaid")
     except Exception:
         cart, created = Cart.objects.get_or_create(customer=user)
