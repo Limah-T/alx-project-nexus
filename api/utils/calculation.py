@@ -121,4 +121,3 @@ def checkOut(check_out, user):
         return checkout
     return check_out
 
-
